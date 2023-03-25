@@ -1,6 +1,6 @@
-# <img src='icon.png' alt='PKHex Icon' style='height:.8em;transform:translate(0, 0.05em)'> PKHeX MAUI 🏝️
+# <img src='Icon.png' alt='PKHex Icon' style='height:1em;transform:translate(0, 0.12em)'> PKHeX MAUI 🏝️
 
-English / [Español](.github/README-es.md) / [Français](.github/README-fr.md) / [Deutsch](.github/README-de.md) / [Italiano](.github/README-it.md) / [繁體中文](.github/README-zhHK.md) / [简体中文](.github/README-zh.md)
+English | [Español](.github/README-es.md) | [Français](.github/README-fr.md) | [Deutsch](.github/README-de.md) | [Italiano](.github/README-it.md) | [繁體中文](.github/README-zhHK.md) | [简体中文](.github/README-zh.md)
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)
 
