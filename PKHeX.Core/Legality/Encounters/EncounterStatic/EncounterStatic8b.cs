@@ -4,7 +4,7 @@ using static PKHeX.Core.StaticCorrelation8bRequirement;
 namespace PKHeX.Core;
 
 /// <summary>
-/// Generation 7 Static Encounter
+/// Generation 8 Static Encounter
 /// </summary>
 /// <inheritdoc cref="EncounterStatic"/>
 public sealed record EncounterStatic8b : EncounterStatic, IStaticCorrelation8b
@@ -20,7 +20,7 @@ public sealed record EncounterStatic8b : EncounterStatic, IStaticCorrelation8b
     protected override bool IsMatchLocation(PKM pk)
     {
         if (pk is PK8)
-            return Locations.IsValidMetBDSP((ushort)pk.Met_Location, pk.Version);
+            return LocationsHOME.IsValidMetBDSP((ushort)pk.Met_Location, pk.Version);
         if (!Roaming)
             return base.IsMatchLocation(pk);
         return IsRoamingLocation(pk);
@@ -54,12 +54,7 @@ public sealed record EncounterStatic8b : EncounterStatic, IStaticCorrelation8b
                 return pk.Egg_Location == 0;
 
             if (pk is PK8)
-            {
-                if (EggLocation > 60000 && pk.Egg_Location == Locations.HOME_SWSHBDSPEgg)
-                    return true;
-                // >60000 can be reset to Link Trade (30001), then altered differently.
-                return Locations.IsValidMetBDSP((ushort)pk.Egg_Location, pk.Version) && pk.Egg_Location == pk.Met_Location;
-            }
+                return LocationsHOME.IsLocationSWSHEgg(pk.Version, pk.Met_Location, pk.Egg_Location, (ushort)EggLocation);
 
             // Hatched
             return pk.Egg_Location == EggLocation || pk.Egg_Location == Locations.LinkTrade6NPC;
@@ -105,7 +100,7 @@ public sealed record EncounterStatic8b : EncounterStatic, IStaticCorrelation8b
     }
 
     // defined by mvpoke in encounter data
-    private static readonly ushort[] Roaming_MetLocation_BDSP =
+    private static ReadOnlySpan<ushort> Roaming_MetLocation_BDSP => new ushort[]
     {
         197, 201, 354, 355, 356, 357, 358, 359, 361, 362, 364, 365, 367, 373, 375, 377,
         378, 379, 383, 385, 392, 394, 395, 397, 400, 403, 404, 407,

@@ -161,7 +161,8 @@ public abstract record EncounterStatic(GameVersion Version) : IEncounterable, IM
         else
         {
             Span<ushort> moves = stackalloc ushort[4];
-            MoveLevelUp.GetEncounterMoves(moves, pk, level, version);
+            var source = GameData.GetLearnSource(version);
+            source.SetEncounterMoves(Species, Form, level, moves);
             pk.SetMoves(moves);
             pk.SetMaximumPPCurrent(moves);
         }
@@ -198,11 +199,6 @@ public abstract record EncounterStatic(GameVersion Version) : IEncounterable, IM
             case EncounterStatic3 { Species: (ushort)Core.Species.Deoxys, Version: GameVersion.E } when lang == 1:
                 pk.OT_Name = "GF";
                 return (int)LanguageID.English;
-
-            // Some Pokewalker courses are only available in Japanese(/Korean) games.
-            case EncounterStatic4Pokewalker p when !p.IsCourseAvailable(lang):
-                pk.OT_Name = "ゲーフリ";
-                return (int)LanguageID.Japanese;
 
             default:
                 return lang;

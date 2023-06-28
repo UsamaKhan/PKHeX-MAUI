@@ -14,7 +14,7 @@ public sealed record EncounterSlot8b : EncounterSlot
     public bool IsMarsh => Area.Location is (>= 219 and <= 224);
     public override Ball FixedBall => IsMarsh ? Ball.Safari : Ball.None;
 
-    public EncounterSlot8b(EncounterArea area, ushort species, byte form, byte min, byte max) : base(area, species, form, min, max)
+    public EncounterSlot8b(EncounterArea8b area, ushort species, byte form, byte min, byte max) : base(area, species, form, min, max)
     {
     }
 
@@ -41,10 +41,10 @@ public sealed record EncounterSlot8b : EncounterSlot
         var et = PersonalTable.BDSP;
         var sf = et.GetFormEntry(Species, Form);
         var species = sf.HatchSpecies;
-        var baseEgg = Legal.EggMovesBDSP[species].Moves;
+        var baseEgg = LearnSource8BDSP.Instance.GetEggMoves(species, 0);
         if (baseEgg.Length == 0)
             return move == 0;
-        return Array.IndexOf(baseEgg, move) >= 0;
+        return baseEgg.Contains(move);
     }
 
     public bool GetBaseEggMove(out ushort move)
@@ -52,7 +52,7 @@ public sealed record EncounterSlot8b : EncounterSlot
         var et = PersonalTable.BDSP;
         var sf = et.GetFormEntry(Species, Form);
         var species = sf.HatchSpecies;
-        var baseEgg = Legal.EggMovesBDSP[species].Moves;
+        var baseEgg = LearnSource8BDSP.Instance.GetEggMoves(species, 0);
         if (baseEgg.Length == 0)
         {
             move = 0;

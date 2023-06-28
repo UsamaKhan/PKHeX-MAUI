@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
@@ -107,7 +106,7 @@ public partial class MemoryContext6
     /// <summary>
     /// 24bits of flags allowing certain feelings for a given memory index.
     /// </summary>
-    private static readonly uint[] MemoryFeelings =
+    private static ReadOnlySpan<int> MemoryFeelings => new[]
     {
         0x000000, 0x04CBFD, 0x004BFD, 0x04CBFD, 0x04CBFD, 0xFFFBFB, 0x84FFF9, 0x47FFFF, 0xBF7FFA, 0x7660B0,
         0x80BDF9, 0x88FB7A, 0x083F79, 0x0001FE, 0xCFEFFF, 0x84EBAF, 0xB368B0, 0x091F7E, 0x0320A0, 0x080DDD,
@@ -118,22 +117,31 @@ public partial class MemoryContext6
         0xB770B0, 0x881F7A, 0x839F7A, 0x839F7A, 0x839F7A, 0x53897F, 0x41BB6F, 0x0C35FF, 0x8BBF7F, 0x8BBF7F,
     };
 
-    private static readonly Dictionary<ushort, ushort[]> KeyItemMemoryArgsGen6 = new()
+    private static ReadOnlySpan<ushort> KeyItemMemoryArgsAnySpecies => new ushort[]
     {
-        {(int) Species.Shaymin, new ushort[] {466}}, // Gracidea
-        {(int) Species.Tornadus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Thundurus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Landorus, new ushort[] {638}}, // Reveal Glass
-        {(int) Species.Kyurem, new ushort[] {628, 629}}, // DNA Splicers
-        {(int) Species.Hoopa, new ushort[] {765}}, // Prison Bottle
+        466, // Gracidea
+        628, 629, // DNA Splicers
+        638, // Reveal Glass
+        765, // Prison Bottle
     };
 
-    private static readonly ushort[] KeyItemUsableObserve6 =
+    private static bool IsKeyItemMemoryArgValid(ushort species, ushort arg) => species switch
     {
-        775, // Eon Flute
+        (int)Species.Shaymin => arg is 466, // Gracidea
+        (int)Species.Tornadus => arg is 638, // Reveal Glass
+        (int)Species.Thundurus => arg is 638, // Reveal Glass
+        (int)Species.Landorus => arg is 638, // Reveal Glass
+        (int)Species.Kyurem => arg is 628 or 629, // DNA Splicers
+        (int)Species.Hoopa => arg is 765, // Prison Bottle
+        _ => false,
     };
 
-    private static readonly HashSet<ushort> PurchaseableItemXY = new()
+    /// <summary>
+    /// Only item that can be observed by other Pokémon in party, to show up as a memory arg.
+    /// </summary>
+    private const ushort KeyItemUsableObserveEonFlute = 775; // Eon Flute
+
+    private static ReadOnlySpan<ushort> PurchaseableItemXY => new ushort[]
     {
         002, 003, 004, 006, 007, 008, 009, 010, 011, 012,
         013, 014, 015, 017, 018, 019, 020, 021, 022, 023,
@@ -145,7 +153,7 @@ public partial class MemoryContext6
         365, 377, 379, 395, 402, 403, 405, 411, 618,
     };
 
-    private static readonly HashSet<ushort> PurchaseableItemAO = new()
+    private static ReadOnlySpan<ushort> PurchaseableItemAO => new ushort[]
     {
         002, 003, 004, 006, 007, 008, 009, 010, 011, 013,
         014, 015, 017, 018, 019, 020, 021, 022, 023, 024,
@@ -158,7 +166,7 @@ public partial class MemoryContext6
         694,
     };
 
-    private static readonly ushort[] LotoPrizeXYAO =
+    private static ReadOnlySpan<ushort> LotoPrizeXYAO => new ushort[]
     {
         0001, 0033, 0050, 0051, 0053,
     };

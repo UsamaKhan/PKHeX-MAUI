@@ -43,7 +43,7 @@ public static class BallApplicator
         Span<Ball> balls = stackalloc Ball[MaxBallSpanAlloc];
         var count = GetBallListFromColor(pk, balls);
         balls = balls[..count];
-        Util.Shuffle(balls);
+        Util.Rand.Shuffle(balls);
         return ApplyFirstLegalBall(pk, balls);
     }
 
@@ -106,13 +106,15 @@ public static class BallApplicator
         var currentIndex = Array.IndexOf(items, current);
         if (currentIndex < 0)
             currentIndex = items.Length - 2;
+        return GetCircularOnce(items, currentIndex, result);
+    }
 
-        int ctr = 0;
-        for (int i = currentIndex + 1; i < items.Length; i++)
-            result[ctr++] = items[i];
-        for (int i = 0; i <= currentIndex; i++)
-            result[ctr++] = items[i];
-        return ctr;
+    private static int GetCircularOnce<T>(ReadOnlySpan<T> items, int startIndex, Span<T> result)
+    {
+        var tail = items[(startIndex + 1)..];
+        tail.CopyTo(result);
+        items[..startIndex].CopyTo(result[tail.Length..]);
+        return items.Length;
     }
 
     private static readonly Ball[] BallList = (Ball[])Enum.GetValues(typeof(Ball));
@@ -120,8 +122,8 @@ public static class BallApplicator
 
     static BallApplicator()
     {
-        Span<Ball> exclude = stackalloc Ball[] {None, Poke};
-        Span<Ball> end = stackalloc Ball[] {Poke};
+        ReadOnlySpan<Ball> exclude = stackalloc Ball[] {None, Poke};
+        ReadOnlySpan<Ball> end = stackalloc Ball[] {Poke};
         Span<Ball> all = stackalloc Ball[BallList.Length - exclude.Length];
         all = all[..FillExcept(all, exclude, BallList)];
 

@@ -62,14 +62,14 @@ public static class EncounterFinder
                 continue;
 
             // We ran out of possible encounters without finding a suitable match; add a message indicating that the encounter is not a complete match.
-            info.Parse.Add(new CheckResult(Severity.Invalid, LEncInvalid, CheckIdentifier.Encounter));
+            info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.Encounter, LEncInvalid));
             break;
         }
 
         if (info is { FrameMatches: false, EncounterMatch: EncounterSlot }) // if false, all valid RNG frame matches have already been consumed
-            info.Parse.Add(new CheckResult(ParseSettings.RNGFrameNotFound, LEncConditionBadRNGFrame, CheckIdentifier.PID)); // todo for further confirmation
+            info.Parse.Add(new CheckResult(ParseSettings.RNGFrameNotFound, CheckIdentifier.PID, LEncConditionBadRNGFrame)); // todo for further confirmation
         if (!info.PIDIVMatches) // if false, all valid PIDIV matches have already been consumed
-            info.Parse.Add(new CheckResult(Severity.Invalid, LPIDTypeMismatch, CheckIdentifier.PID));
+            info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.PID, LPIDTypeMismatch));
     }
 
     /// <summary>
@@ -130,7 +130,7 @@ public static class EncounterFinder
         }
         else if (pk is PK1 pk1)
         {
-            var hasGen2 = Array.Exists(info.Moves, z => z.Generation is 2);
+            var hasGen2 = MoveInfo.IsAnyFromGeneration(2, info.Moves);
             if (hasGen2)
             {
                 if (!ParseSettings.AllowGen1Tradeback)
@@ -155,7 +155,7 @@ public static class EncounterFinder
         info.EncounterMatch = new EncounterInvalid(pk);
         string hint = GetHintWhyNotFound(pk, info.EncounterMatch.Generation);
 
-        info.Parse.Add(new CheckResult(Severity.Invalid, hint, CheckIdentifier.Encounter));
+        info.Parse.Add(new CheckResult(Severity.Invalid, CheckIdentifier.Encounter, hint));
         LearnVerifierRelearn.Verify(info.Relearn, info.EncounterOriginal, pk);
         LearnVerifier.Verify(info.Moves, pk, info.EncounterMatch, info.EvoChainsAllGens);
     }
@@ -174,7 +174,7 @@ public static class EncounterFinder
     private static bool WasGiftEgg(PKM pk, int gen, ushort loc) => !pk.FatefulEncounter && gen switch
     {
         3 => pk.IsEgg && (byte)pk.Met_Location == 253, // Gift Egg, indistinguishable from normal eggs after hatch
-        4 => Legal.GiftEggLocation4.Contains(loc) || (pk.Format != 4 && (loc == Locations.Faraway4 && pk.HGSS)),
+        4 => (uint)(loc - 2009) <= (2014 - 2009) || (pk.Format != 4 && (loc == Locations.Faraway4 && pk.HGSS)),
         5 => loc is Locations.Breeder5,
         _ => loc is Locations.Breeder6,
     };

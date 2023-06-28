@@ -17,7 +17,7 @@ public partial class SAV_SimpleTrainer : Form
         SAV = (Origin = sav).Clone();
         Loading = true;
 
-        cba = new[] {CHK_1, CHK_2, CHK_3, CHK_4, CHK_5, CHK_6, CHK_7, CHK_8};
+        cba = new[] { CHK_1, CHK_2, CHK_3, CHK_4, CHK_5, CHK_6, CHK_7, CHK_8 };
         TB_OTName.MaxLength = SAV.MaxStringLengthOT;
         B_MaxCash.Click += (sender, e) => MT_Money.Text = SAV.MaxMoney.ToString();
         B_MaxCoins.Click += (sender, e) => MT_Coins.Text = SAV.MaxCoins.ToString();
@@ -296,17 +296,17 @@ public partial class SAV_SimpleTrainer : Form
         if (sender is ComboBox c)
         {
             int index = WinFormsUtil.GetIndex(c);
-            if (SAV is SAV4 sav4)
+            if (SAV is SAV4)
             {
                 Main.SetCountrySubRegion(CB_Region, $"gen4_sr_{index:000}");
                 if (CB_Region.Items.Count == 0)
-                    Main.SetCountrySubRegion(CB_Region, $"gen4_sr_default");
+                    Main.SetCountrySubRegion(CB_Region, "gen4_sr_default");
             }
-            else if (SAV is SAV5 s)
+            else if (SAV is SAV5)
             {
                 Main.SetCountrySubRegion(CB_Region, $"gen5_sr_{index:000}");
                 if (CB_Region.Items.Count == 0)
-                    Main.SetCountrySubRegion(CB_Region, $"gen5_sr_default");
+                    Main.SetCountrySubRegion(CB_Region, "gen5_sr_default");
             }
         }
     }

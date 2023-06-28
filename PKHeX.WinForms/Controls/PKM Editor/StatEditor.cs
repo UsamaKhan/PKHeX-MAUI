@@ -13,13 +13,13 @@ public partial class StatEditor : UserControl
     public StatEditor()
     {
         InitializeComponent();
-        MT_IVs   = new[] {TB_IVHP, TB_IVATK, TB_IVDEF, TB_IVSPE, TB_IVSPA, TB_IVSPD};
-        MT_EVs   = new[] {TB_EVHP, TB_EVATK, TB_EVDEF, TB_EVSPE, TB_EVSPA, TB_EVSPD};
-        MT_AVs   = new[] {TB_AVHP, TB_AVATK, TB_AVDEF, TB_AVSPE, TB_AVSPA, TB_AVSPD};
-        MT_GVs   = new[] {TB_GVHP, TB_GVATK, TB_GVDEF, TB_GVSPE, TB_GVSPA, TB_GVSPD};
-        MT_Stats = new[] {Stat_HP, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD};
-        L_Stats  = new[] {Label_HP, Label_ATK, Label_DEF, Label_SPE, Label_SPA, Label_SPD};
-        MT_Base  = new[] {TB_BaseHP, TB_BaseATK, TB_BaseDEF, TB_BaseSPE, TB_BaseSPA, TB_BaseSPD};
+        MT_IVs = new[] { TB_IVHP, TB_IVATK, TB_IVDEF, TB_IVSPE, TB_IVSPA, TB_IVSPD };
+        MT_EVs = new[] { TB_EVHP, TB_EVATK, TB_EVDEF, TB_EVSPE, TB_EVSPA, TB_EVSPD };
+        MT_AVs = new[] { TB_AVHP, TB_AVATK, TB_AVDEF, TB_AVSPE, TB_AVSPA, TB_AVSPD };
+        MT_GVs = new[] { TB_GVHP, TB_GVATK, TB_GVDEF, TB_GVSPE, TB_GVSPA, TB_GVSPD };
+        MT_Stats = new[] { Stat_HP, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD };
+        L_Stats = new[] { Label_HP, Label_ATK, Label_DEF, Label_SPE, Label_SPA, Label_SPD };
+        MT_Base = new[] { TB_BaseHP, TB_BaseATK, TB_BaseDEF, TB_BaseSPE, TB_BaseSPA, TB_BaseSPD };
 
         TB_BST.ResetForeColor();
         TB_IVTotal.ForeColor = TB_EVTotal.ForeColor = MT_EVs[0].ForeColor;
@@ -73,20 +73,20 @@ public partial class StatEditor : UserControl
                 break;
 
             case Keys.Control: // Max
-            {
-                var index = Array.IndexOf(MT_IVs, t);
-                t.Text = Entity.GetMaximumIV(index, true).ToString();
-                break;
-            }
+                {
+                    var index = Array.IndexOf(MT_IVs, t);
+                    t.Text = Entity.GetMaximumIV(index, true).ToString();
+                    break;
+                }
 
             case Keys.Shift when Entity is IHyperTrain h: // HT
-            {
-                var index = Array.IndexOf(MT_IVs, t);
-                bool flag = h.HyperTrainInvert(index);
-                UpdateHyperTrainingFlag(index, flag);
-                UpdateStats();
-                break;
-            }
+                {
+                    var index = Array.IndexOf(MT_IVs, t);
+                    bool flag = h.HyperTrainInvert(index);
+                    UpdateHyperTrainingFlag(index, flag);
+                    UpdateStats();
+                    break;
+                }
         }
     }
 
@@ -114,7 +114,7 @@ public partial class StatEditor : UserControl
 
         if ((ModifierKeys & Keys.Control) != 0) // Max
         {
-            var max = Legal.AwakeningMax.ToString();
+            var max = AwakeningUtil.AwakeningMax.ToString();
             t.Text = t.Text == max ? 0.ToString() : max;
         }
         else if ((ModifierKeys & Keys.Alt) != 0) // Min
@@ -218,9 +218,9 @@ public partial class StatEditor : UserControl
         if (sender is MaskedTextBox m)
         {
             var value = (byte)Math.Min(byte.MaxValue, Util.ToInt32(m.Text));
-            if (value > Legal.AwakeningMax)
+            if (value > AwakeningUtil.AwakeningMax)
             {
-                m.Text = Legal.AwakeningMax.ToString();
+                m.Text = AwakeningUtil.AwakeningMax.ToString();
                 return; // recursive on text set
             }
 
@@ -561,7 +561,7 @@ public partial class StatEditor : UserControl
     public void LoadGVs(IGanbaru a)
     {
         ChangingFields = true;
-        TB_GVHP.Text  = a.GV_HP.ToString();
+        TB_GVHP.Text = a.GV_HP.ToString();
         TB_GVATK.Text = a.GV_ATK.ToString();
         TB_GVDEF.Text = a.GV_DEF.ToString();
         TB_GVSPE.Text = a.GV_SPE.ToString();
@@ -695,13 +695,13 @@ public partial class StatEditor : UserControl
     private void CHK_Gigantamax_CheckedChanged(object sender, EventArgs e)
     {
         if (!ChangingFields)
-            ((PKMEditor) MainEditor).UpdateSprite();
+            ((PKMEditor)MainEditor).UpdateSprite();
     }
 
     private void CHK_IsAlpha_CheckedChanged(object sender, EventArgs e)
     {
         if (!ChangingFields)
-            ((PKMEditor) MainEditor).UpdateSprite();
+            ((PKMEditor)MainEditor).UpdateSprite();
     }
 
     private void L_TeraTypeOverride_Click(object sender, EventArgs e) => CB_TeraTypeOverride.SelectedValue = (int)TeraOverrideNoneValue;

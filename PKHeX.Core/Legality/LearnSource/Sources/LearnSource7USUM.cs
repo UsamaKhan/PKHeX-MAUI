@@ -13,8 +13,8 @@ public sealed class LearnSource7USUM : ILearnSource<PersonalInfo7>, IEggSource
 {
     public static readonly LearnSource7USUM Instance = new();
     private static readonly PersonalTable7 Personal = PersonalTable.USUM;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpUSUM;
-    private static readonly EggMoves7[] EggMoves = Legal.EggMovesUSUM;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_uu.pkl"), "uu"));
+    private static readonly EggMoves7[] EggMoves = EggMoves7.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_uu.pkl"), "uu"));
     private const int MaxSpecies = Legal.MaxSpeciesID_7_USUM;
     private const LearnEnvironment Game = USUM;
     private const int ReminderBonus = 100; // Move reminder allows re-learning ALL level up moves regardless of level.
@@ -34,15 +34,15 @@ public sealed class LearnSource7USUM : ILearnSource<PersonalInfo7>, IEggSource
     {
         if (species > MaxSpecies)
             return false;
-        var moves = MoveEgg.GetFormEggMoves(species, form, EggMoves).AsSpan();
-        return moves.IndexOf(move) != -1;
+        var moves = EggMoves.GetFormEggMoves(species, form);
+        return moves.Contains(move);
     }
 
     public ReadOnlySpan<ushort> GetEggMoves(ushort species, byte form)
     {
         if (species > MaxSpecies)
             return ReadOnlySpan<ushort>.Empty;
-        return MoveEgg.GetFormEggMoves(species, form, EggMoves);
+        return EggMoves.GetFormEggMoves(species, form);
     }
 
     public MoveLearnInfo GetCanLearn(PKM pk, PersonalInfo7 pi, EvoCriteria evo, ushort move, MoveSourceType types = MoveSourceType.All, LearnOption option = LearnOption.Current)
@@ -55,10 +55,10 @@ public sealed class LearnSource7USUM : ILearnSource<PersonalInfo7>, IEggSource
                 return new(LevelUp, Game, 1);
         }
 
-        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(Array.IndexOf(TMHM_SM, move)))
+        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(TMHM_SM.IndexOf(move)))
             return new(TMHM, Game);
 
-        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(Array.IndexOf(LearnSource5.TypeTutor567, move)))
+        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(LearnSource5.TypeTutor567.IndexOf(move)))
             return new(Tutor, Game);
 
         if (types.HasFlag(MoveSourceType.SpecialTutor) && pi.GetIsLearnTutorSpecial(move))
@@ -102,13 +102,9 @@ public sealed class LearnSource7USUM : ILearnSource<PersonalInfo7>, IEggSource
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(ReminderBonus);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(ReminderBonus);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.Machine))

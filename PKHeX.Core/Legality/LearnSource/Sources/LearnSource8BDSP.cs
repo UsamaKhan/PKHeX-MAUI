@@ -12,8 +12,8 @@ public sealed class LearnSource8BDSP : ILearnSource<PersonalInfo8BDSP>, IEggSour
 {
     public static readonly LearnSource8BDSP Instance = new();
     private static readonly PersonalTable8BDSP Personal = PersonalTable.BDSP;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpBDSP;
-    private static readonly EggMoves6[] EggMoves = Legal.EggMovesBDSP;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_bdsp.pkl"), "bs"));
+    private static readonly EggMoves6[] EggMoves = EggMoves6.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_bdsp.pkl"), "bs"));
     private const int MaxSpecies = Legal.MaxSpeciesID_8b;
     private const LearnEnvironment Game = BDSP;
 
@@ -60,10 +60,10 @@ public sealed class LearnSource8BDSP : ILearnSource<PersonalInfo8BDSP>, IEggSour
         if (types.HasFlag(MoveSourceType.SharedEggMove) && GetIsSharedEggMove(pi, move))
             return new(Shared, Game);
 
-        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(Array.IndexOf(TMHM_BDSP, move)))
+        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(TMHM_BDSP.IndexOf(move)))
             return new(TMHM, Game);
 
-        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(Array.IndexOf(TypeTutor8b, move)))
+        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(TypeTutor8b.IndexOf(move)))
             return new(Tutor, Game);
 
         if (types.HasFlag(MoveSourceType.EnhancedTutor) && GetIsEnhancedTutor(evo, pk, move, option))
@@ -97,13 +97,9 @@ public sealed class LearnSource8BDSP : ILearnSource<PersonalInfo8BDSP>, IEggSour
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.SharedEggMove))
@@ -129,7 +125,7 @@ public sealed class LearnSource8BDSP : ILearnSource<PersonalInfo8BDSP>, IEggSour
         }
     }
 
-    public static readonly ushort[] TMHM_BDSP =
+    public static ReadOnlySpan<ushort> TMHM_BDSP => new ushort[]
     {
         264, 337, 352, 347, 046, 092, 258, 339, 331, 526,
         241, 269, 058, 059, 063, 113, 182, 240, 202, 219,
@@ -144,7 +140,7 @@ public sealed class LearnSource8BDSP : ILearnSource<PersonalInfo8BDSP>, IEggSour
         015, 019, 057, 070, 432, 249, 127, 431,
     };
 
-    internal static readonly ushort[] TypeTutor8b =
+    internal static ReadOnlySpan<ushort> TypeTutor8b => new ushort[]
     {
         (int)Move.FrenzyPlant,
         (int)Move.BlastBurn,

@@ -2,7 +2,6 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using static PKHeX.Core.EncounterTypeGroup;
 
@@ -172,7 +171,7 @@ public static class EncounterMovesetGenerator
     /// <param name="moves">Moves that the resulting <see cref="IEncounterable"/> must be able to learn.</param>
     /// <param name="version">Specific version to iterate for.</param>
     /// <returns>A consumable <see cref="IEncounterable"/> list of possible encounters.</returns>
-    private static IEnumerable<IEncounterable> GenerateVersionEncounters(PKM pk, ReadOnlySpan<ushort> moves, GameVersion version)
+    private static IEnumerable<IEncounterable> GenerateVersionEncounters(PKM pk, ushort[] moves, GameVersion version)
     {
         pk.Version = (int)version;
 
@@ -185,7 +184,11 @@ public static class EncounterMovesetGenerator
         var needs = GetNeededMoves(pk, moves, version);
         var generator = EncounterGenerator.GetGenerator(version);
 
-        return PriorityList.SelectMany(type => GetPossibleOfType(pk, needs, version, type, chain, generator));
+        foreach (var type in PriorityList)
+        {
+            foreach (var enc in GetPossibleOfType(pk, needs, version, type, chain, generator))
+                yield return enc;
+        }
     }
 
     private static bool IsSane(PKM pk, ReadOnlySpan<ushort> moves)
@@ -293,21 +296,7 @@ public static class EncounterMovesetGenerator
         var eggs = generator.GetPossible(pk, chain, version, Egg);
         foreach (var egg in eggs)
         {
-            if (needs.Length == 0)
-            {
-                yield return egg;
-                continue;
-            }
-
-            var eggMoves = MoveEgg.GetEggMoves(egg.Species, egg.Form, egg.Version, egg.Generation);
-            int flags = Moveset.BitOverlap(eggMoves, needs);
-            var vt = Array.IndexOf(needs, (ushort)Move.VoltTackle);
-            if (vt != -1 && egg is EncounterEgg { CanHaveVoltTackle: true })
-                flags |= 1 << vt;
-            else if (egg.Generation <= 2)
-                flags |= GetMoveMaskGen2(needs, egg);
-
-            if (flags == (1 << needs.Length) - 1)
+            if (needs.Length == 0 || HasAllNeededMovesEgg(needs, egg))
                 yield return egg;
         }
     }
@@ -325,22 +314,12 @@ public static class EncounterMovesetGenerator
     {
         var context = pk.Context;
         var gifts = generator.GetPossible(pk, chain, version, Mystery);
-        foreach (var g in gifts)
+        foreach (var enc in gifts)
         {
-            if (!IsSane(chain, g, context))
+            if (!IsSane(chain, enc, context))
                 continue;
-            if (needs.Length == 0)
-            {
-                yield return g;
-                continue;
-            }
-            var flags = 0;
-            if (g is IMoveset m)
-                flags = m.Moves.BitOverlap(needs);
-            if (g is IRelearn r)
-                flags |= r.Relearn.BitOverlap(needs);
-            if (flags == (1 << needs.Length) - 1)
-                yield return g;
+            if (needs.Length == 0 || GetHasAllNeededMoves(needs, enc))
+                yield return enc;
         }
     }
 
@@ -361,15 +340,7 @@ public static class EncounterMovesetGenerator
         {
             if (!IsSane(chain, enc, context))
                 continue;
-            if (needs.Length == 0)
-            {
-                yield return enc;
-                continue;
-            }
-
-            // Some rare encounters have special moves hidden in the Relearn section (Gen7 Wormhole Ho-Oh). Include relearn moves
-            var flags = GetMoveMaskConsiderGen2(needs, enc);
-            if (flags == (1 << needs.Length) - 1)
+            if (needs.Length == 0 || GetHasAllNeededMovesConsiderGen2(needs, enc))
                 yield return enc;
         }
     }
@@ -387,19 +358,12 @@ public static class EncounterMovesetGenerator
     {
         var context = pk.Context;
         var trades = generator.GetPossible(pk, chain, version, Trade);
-        foreach (var trade in trades)
+        foreach (var enc in trades)
         {
-            if (!IsSane(chain, trade, context))
+            if (!IsSane(chain, enc, context))
                 continue;
-            if (needs.Length == 0)
-            {
-                yield return trade;
-                continue;
-            }
-
-            var flags = GetMoveMaskConsiderGen2(needs, trade);
-            if (flags == (1 << needs.Length) - 1)
-                yield return trade;
+            if (needs.Length == 0 || GetHasAllNeededMovesConsiderGen2(needs, enc))
+                yield return enc;
         }
     }
 
@@ -445,13 +409,19 @@ public static class EncounterMovesetGenerator
         return false;
     }
 
-    private static int GetMoveMaskConsiderGen2(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
+    private static int GetMoveMask(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
     {
         var flags = 0;
-        if (enc is IMoveset m)
-            flags = m.Moves.BitOverlap(needs);
+        if (enc is IMoveset { Moves: { HasMoves: true } m })
+            flags = m.BitOverlap(needs);
         if (enc is IRelearn { Relearn: { HasMoves: true } r })
             flags |= r.BitOverlap(needs);
+        return flags;
+    }
+
+    private static int GetMoveMaskConsiderGen2(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
+    {
+        int flags = GetMoveMask(needs, enc);
         if (enc.Generation <= 2)
             flags |= GetMoveMaskGen2(needs, enc);
         return flags;
@@ -460,8 +430,22 @@ public static class EncounterMovesetGenerator
     private static int GetMoveMaskGen2(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
     {
         Span<ushort> moves = stackalloc ushort[4];
-        MoveLevelUp.GetEncounterMoves(moves, enc.Species, 0, enc.LevelMin, enc.Version);
+        var source = GameData.GetLearnSource(enc.Version);
+        source.SetEncounterMoves(enc.Species, 0, enc.LevelMin, moves);
         return Moveset.BitOverlap(moves, needs);
+    }
+
+    private static int GetMoveMaskEgg(ReadOnlySpan<ushort> needs, IEncounterTemplate egg)
+    {
+        var source = GameData.GetLearnSource(egg.Version);
+        var eggMoves = source.GetEggMoves(egg.Species, egg.Form);
+        int flags = Moveset.BitOverlap(eggMoves, needs);
+        var vt = needs.IndexOf((ushort)Move.VoltTackle);
+        if (vt != -1 && egg is EncounterEgg { CanHaveVoltTackle: true })
+            flags |= 1 << vt;
+        else if (egg.Generation <= 2)
+            flags |= GetMoveMaskGen2(needs, egg);
+        return flags;
     }
 
     private static bool HasAllNeededMovesSlot(ReadOnlySpan<ushort> needs, IEncounterTemplate slot)
@@ -475,6 +459,25 @@ public static class EncounterMovesetGenerator
         if (slot.Generation <= 2)
             return HasAllNeededMovesEncounter2(needs, slot);
         return false;
+    }
+
+    private static bool HasAllNeededMovesEgg(ReadOnlySpan<ushort> needs, IEncounterTemplate egg)
+    {
+        int flags = GetMoveMaskEgg(needs, egg);
+        return flags == (1 << needs.Length) - 1;
+    }
+
+    private static bool GetHasAllNeededMoves(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
+    {
+        int flags = GetMoveMask(needs, enc);
+        return flags == (1 << needs.Length) - 1;
+    }
+
+    private static bool GetHasAllNeededMovesConsiderGen2(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)
+    {
+        // Some rare encounters have special moves hidden in the Relearn section (Gen7 Wormhole Ho-Oh). Include relearn moves
+        int flags = GetMoveMaskConsiderGen2(needs, enc);
+        return flags == (1 << needs.Length) - 1;
     }
 
     private static bool HasAllNeededMovesEncounter2(ReadOnlySpan<ushort> needs, IEncounterTemplate enc)

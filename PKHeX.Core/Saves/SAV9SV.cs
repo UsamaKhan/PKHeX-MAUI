@@ -5,7 +5,7 @@ using static System.Buffers.Binary.BinaryPrimitives;
 namespace PKHeX.Core;
 
 /// <summary>
-/// Generation 9 <see cref="SaveFile"/> object for <see cref="GameVersion.SWSH"/> games.
+/// Generation 9 <see cref="SaveFile"/> object for <see cref="GameVersion.SV"/> games.
 /// </summary>
 public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFileRevision
 {
@@ -54,7 +54,7 @@ public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFile
     protected override byte[] GetFinalData() => SwishCrypto.Encrypt(AllBlocks);
 
     public override PersonalTable9SV Personal => PersonalTable.SV;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_SV;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_SV;
 
     #region Blocks
     public SCBlockAccessor Accessor => Blocks;
@@ -76,6 +76,7 @@ public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFile
     public PlayerAppearance9 PlayerAppearance => Blocks.PlayerAppearance;
     public RaidSpawnList9 Raid => Blocks.Raid;
     public RaidSevenStar9 RaidSevenStar => Blocks.RaidSevenStar;
+    public Epoch1900Value EnrollmentDate => Blocks.EnrollmentDate;
     #endregion
 
     protected override SAV9SV CloneInternal()
@@ -90,7 +91,7 @@ public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFile
     public override ushort MaxSpeciesID => Legal.MaxSpeciesID_9;
     public override int MaxItemID => Legal.MaxItemID_9;
     public override int MaxBallID => Legal.MaxBallID_9;
-    public override int MaxGameID => Legal.MaxGameID_9;
+    public override int MaxGameID => Legal.MaxGameID_HOME;
     public override int MaxAbilityID => Legal.MaxAbilityID_9;
 
     private void Initialize()
@@ -217,10 +218,10 @@ public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFile
         protected set => PartyInfo.PartyCount = value;
     }
 
-    protected override byte[] BoxBuffer => BoxInfo.Data;
-    protected override byte[] PartyBuffer => PartyInfo.Data;
+    protected override Span<byte> BoxBuffer => BoxInfo.Data;
+    protected override Span<byte> PartyBuffer => PartyInfo.Data;
     public override PK9 GetDecryptedPKM(byte[] data) => GetPKM(DecryptPKM(data));
-    public override PK9 GetBoxSlot(int offset) => GetDecryptedPKM(GetData(BoxInfo.Data, offset, SIZE_PARTY)); // party format in boxes!
+    public override PK9 GetBoxSlot(int offset) => GetDecryptedPKM(BoxInfo.Data.AsSpan(offset, SIZE_PARTY).ToArray()); // party format in boxes!
 
     //public int GetRecord(int recordID) => Records.GetRecord(recordID);
     //public void SetRecord(int recordID, int value) => Records.SetRecord(recordID, value);
@@ -306,6 +307,12 @@ public sealed class SAV9SV : SaveFile, ISaveBlock9Main, ISCBlockArray, ISaveFile
 
         foreach (var block in blocks)
             Accessor.GetBlock(block).SetValue(1); // lift seals from each shrine
+
+        // remove chains from each shrine
+        Accessor.GetBlock(SaveBlockAccessor9SV.KStakesRemovedTingLu).SetValue((ulong)10);
+        Accessor.GetBlock(SaveBlockAccessor9SV.KStakesRemovedChienPao).SetValue((ulong)10);
+        Accessor.GetBlock(SaveBlockAccessor9SV.KStakesRemovedWoChien).SetValue((ulong)10);
+        Accessor.GetBlock(SaveBlockAccessor9SV.KStakesRemovedChiYu).SetValue((ulong)10);
     }
 
     public void UnlockAllTMRecipes()

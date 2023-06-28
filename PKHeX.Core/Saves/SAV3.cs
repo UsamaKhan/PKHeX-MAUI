@@ -60,6 +60,7 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
         int end = start + SIZE_MAIN;
         for (int ofs = start; ofs < end; ofs += SIZE_SECTOR)
         {
+            // Get the sector ID for the serialized savedata block, and copy the chunk into the corresponding object.
             var id = ReadInt16LittleEndian(data[(ofs + 0xFF4)..]);
             switch (id)
             {
@@ -76,6 +77,7 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
         int end = start + SIZE_MAIN;
         for (int ofs = start; ofs < end; ofs += SIZE_SECTOR)
         {
+            // Get the sector ID for the serialized savedata block, and copy the corresponding chunk of object data into it.
             var id = ReadInt16LittleEndian(data[(ofs + 0xFF4)..]);
             switch (id)
             {
@@ -97,7 +99,7 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
         System.Diagnostics.Debug.Assert(slot is 0 or 1);
         int start = SIZE_MAIN * slot;
         int end = start + SIZE_MAIN;
-        int bitTrack = 0;
+        int bitTrack = 0; // bit flags for each sector, 1 if present
         sector0 = 0;
         for (int ofs = start; ofs < end; ofs += SIZE_SECTOR)
         {
@@ -113,8 +115,8 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
 
     private static int GetActiveSlot(ReadOnlySpan<byte> data)
     {
-        if (data.Length == SaveUtil.SIZE_G3RAWHALF)
-            return 0;
+        if (data.Length == SaveUtil.SIZE_G3RAWHALF) // misconfigured emulator FLASH size
+            return 0; // not enough data for a secondary save
 
         var v0 = IsAllMainSectorsPresent(data, 0, out var sectorZero0);
         var v1 = IsAllMainSectorsPresent(data, 1, out var sectorZero1);
@@ -180,7 +182,7 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
         _ => throw new ArgumentOutOfRangeException(nameof(version)),
     };
 
-    public sealed override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_RS;
+    public sealed override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_RS;
 
     public sealed override int BoxCount => 14;
     public sealed override int MaxEV => 255;
@@ -197,8 +199,8 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
     protected sealed override PK3 GetPKM(byte[] data) => new(data);
     protected sealed override byte[] DecryptPKM(byte[] data) => PokeCrypto.DecryptArray3(data);
 
-    protected sealed override byte[] BoxBuffer => Storage;
-    protected sealed override byte[] PartyBuffer => Large;
+    protected sealed override Span<byte> BoxBuffer => Storage;
+    protected sealed override Span<byte> PartyBuffer => Large;
 
     private const int COUNT_BOX = 14;
     private const int COUNT_SLOTSPERBOX = 30;
@@ -594,9 +596,19 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
         return new Mail3(data, ofs, Japanese);
     }
 
+    #region eBerry
+    public abstract byte[] GetEReaderBerry();
+    public abstract void SetEReaderBerry(ReadOnlySpan<byte> data);
     public abstract string EBerryName { get; }
     public abstract bool IsEBerryEngima { get; }
-    public abstract MysteryEvent3 MysteryEvent { get; set; }
+    #endregion
+
+    #region eTrainer
+    public abstract byte[] GetEReaderTrainer();
+    public abstract void SetEReaderTrainer(ReadOnlySpan<byte> data);
+    #endregion
+
+    public abstract Gen3MysteryData MysteryData { get; set; }
 
     public byte[] GetHallOfFameData()
     {
@@ -623,9 +635,9 @@ public abstract class SAV3 : SaveFile, ILangDeviantSave, IEventFlag37
     {
         SetData(sav.Data, 0);
         var s3 = (SAV3)sav;
-        SetData(Small, s3.Small, 0);
-        SetData(Large, s3.Large, 0);
-        SetData(Storage, s3.Storage, 0);
+        SetData(Small, s3.Small);
+        SetData(Large, s3.Large);
+        SetData(Storage, s3.Storage);
     }
 
     #region External Connections

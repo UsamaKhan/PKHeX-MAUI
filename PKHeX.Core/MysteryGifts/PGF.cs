@@ -9,6 +9,7 @@ namespace PKHeX.Core;
 public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature
 {
     public const int Size = 0xCC;
+    public const int SizeFull = 0x2D0;
     public override int Generation => 5;
     public override EntityContext Context => EntityContext.Gen5;
     public override bool FatefulEncounter => true;
@@ -246,7 +247,8 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         if (Move1 == 0) // No moves defined
         {
             Span<ushort> moves = stackalloc ushort[4];
-            MoveLevelUp.GetEncounterMoves(moves, Species, Form, Level, (GameVersion)pk.Version);
+            var source = GameData.GetLearnSource((GameVersion)pk.Version);
+            source.SetEncounterMoves(Species, Form, Level, moves);
             pk.SetMoves(moves);
         }
 

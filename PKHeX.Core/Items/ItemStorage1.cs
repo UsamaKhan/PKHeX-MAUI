@@ -1,13 +1,13 @@
+using System;
+
 namespace PKHeX.Core;
 
-public static partial class Legal
+public sealed class ItemStorage1 : IItemStorage
 {
-    internal const int MaxSpeciesID_1 = 151;
-    internal const int MaxMoveID_1 = 165;
-    internal const int MaxItemID_1 = 255;
-    internal const int MaxAbilityID_1 = 0;
+    public static readonly ItemStorage1 Instance = new();
+    private ItemStorage1() { }
 
-    internal static readonly ushort[] Pouch_Items_RBY =
+    private static ReadOnlySpan<ushort> Pouch_Items_RBY => new ushort[]
     {
         000,001,002,003,004,005,006,            010,011,012,013,014,015,
         016,017,018,019,020,                                029,030,031,
@@ -23,4 +23,8 @@ public static partial class Legal
         224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,
         240,241,242,243,244,245,246,247,248,249,250,
     };
+
+    public bool IsLegal(InventoryType type, int itemIndex, int itemCount) => true;
+
+    public ReadOnlySpan<ushort> GetItems(InventoryType type) => Pouch_Items_RBY;
 }

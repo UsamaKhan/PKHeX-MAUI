@@ -12,8 +12,8 @@ public sealed class LearnSource6AO : ILearnSource<PersonalInfo6AO>, IEggSource
 {
     public static readonly LearnSource6AO Instance = new();
     private static readonly PersonalTable6AO Personal = PersonalTable.AO;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpAO;
-    private static readonly EggMoves6[] EggMoves = Legal.EggMovesAO;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_ao.pkl"), "ao"));
+    private static readonly EggMoves6[] EggMoves = EggMoves6.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_ao.pkl"), "ao"));
     private const int MaxSpecies = Legal.MaxSpeciesID_6;
     private const LearnEnvironment Game = ORAS;
 
@@ -56,7 +56,7 @@ public sealed class LearnSource6AO : ILearnSource<PersonalInfo6AO>, IEggSource
         if (types.HasFlag(MoveSourceType.Machine) && GetIsTM(pi, move))
             return new(TMHM, Game);
 
-        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(Array.IndexOf(LearnSource5.TypeTutor567, move)))
+        if (types.HasFlag(MoveSourceType.TypeTutor) && pi.GetIsLearnTutorType(LearnSource5.TypeTutor567.IndexOf(move)))
             return new(Tutor, Game);
 
         if (types.HasFlag(MoveSourceType.SpecialTutor) && pi.GetIsTutorSpecial(move))
@@ -86,7 +86,7 @@ public sealed class LearnSource6AO : ILearnSource<PersonalInfo6AO>, IEggSource
 
     private static bool GetIsTM(PersonalInfo6AO info, ushort move)
     {
-        var index = Array.IndexOf(TMHM_AO, move);
+        var index = TMHM_AO.IndexOf(move);
         return info.GetIsLearnTM(index);
     }
 
@@ -98,13 +98,9 @@ public sealed class LearnSource6AO : ILearnSource<PersonalInfo6AO>, IEggSource
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.Machine))
@@ -126,7 +122,7 @@ public sealed class LearnSource6AO : ILearnSource<PersonalInfo6AO>, IEggSource
         }
     }
 
-    internal static readonly ushort[] TMHM_AO =
+    internal static ReadOnlySpan<ushort> TMHM_AO => new ushort[]
     {
         468, 337, 473, 347, 046, 092, 258, 339, 474, 237,
         241, 269, 058, 059, 063, 113, 182, 240, 355, 219,

@@ -12,8 +12,6 @@ public sealed record EncounterArea1 : EncounterArea
     public readonly int Rate;
     public readonly EncounterSlot1[] Slots;
 
-    protected override IReadOnlyList<EncounterSlot1> Raw => Slots;
-
     public static EncounterArea1[] GetAreas(BinLinkerAccessor input, GameVersion game)
     {
         var result = new EncounterArea1[input.Length];
@@ -45,7 +43,7 @@ public sealed record EncounterArea1 : EncounterArea
         Slots = slots;
     }
 
-    public override IEnumerable<EncounterSlot1> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
+    public IEnumerable<EncounterSlot1> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
     {
         (bool useCatchRate, byte rate) = pk is PK1 pk1 ? (true, pk1.Catch_Rate) : (false, (byte)0);
         foreach (var slot in Slots)

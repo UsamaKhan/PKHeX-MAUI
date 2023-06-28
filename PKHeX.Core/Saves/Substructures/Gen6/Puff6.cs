@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -10,8 +10,8 @@ public sealed class Puff6 : SaveBlock<SAV6>
 
     public Puff6(SAV6 SAV, int offset) : base(SAV) => Offset = offset;
 
-    public byte[] GetPuffs() => SAV.GetData(Offset, PuffSlots);
-    public void SetPuffs(byte[] value) => SAV.SetData(value, Offset);
+    public Span<byte> GetPuffs() => SAV.Data.AsSpan(Offset, PuffSlots);
+    public void SetPuffs(ReadOnlySpan<byte> value) => SAV.SetData(value, Offset);
 
     public int PuffCount
     {
@@ -43,7 +43,7 @@ public sealed class Puff6 : SaveBlock<SAV6>
         {
             for (int i = 0; i < PuffSlots; i++)
                 Data[Offset + i] = (byte)((i % MaxPuffID) + 1);
-            Util.Shuffle(Data.AsSpan(), Offset, Offset + PuffSlots, rnd);
+            rnd.Shuffle(Data.AsSpan(Offset, PuffSlots));
         }
         PuffCount = PuffSlots;
     }

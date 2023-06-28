@@ -2,19 +2,17 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using static PKHeX.Core.LearnMethod;
 using static PKHeX.Core.LearnEnvironment;
-using static PKHeX.Core.LearnSource5;
 
 namespace PKHeX.Core;
 
 /// <summary>
 /// Exposes information about how moves are learned in <see cref="BW"/>.
 /// </summary>
-public sealed class LearnSource5BW : ILearnSource<PersonalInfo5BW>, IEggSource
+public sealed class LearnSource5BW : LearnSource5, ILearnSource<PersonalInfo5BW>, IEggSource
 {
     public static readonly LearnSource5BW Instance = new();
     private static readonly PersonalTable5BW Personal = PersonalTable.BW;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpBW;
-    private static readonly EggMoves6[] EggMoves = Legal.EggMovesBW;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_bw.pkl"), "51"));
     private const int MaxSpecies = Legal.MaxSpeciesID_5;
     private const LearnEnvironment Game = BW;
 
@@ -84,7 +82,7 @@ public sealed class LearnSource5BW : ILearnSource<PersonalInfo5BW>, IEggSource
 
     private static bool GetIsTypeTutor(PersonalInfo5BW pi, ushort move)
     {
-        var index = Array.IndexOf(TypeTutor567, move);
+        var index = TypeTutor567.IndexOf(move);
         if (index == -1)
             return false;
         return pi.GetIsLearnTutorType(index);
@@ -92,7 +90,7 @@ public sealed class LearnSource5BW : ILearnSource<PersonalInfo5BW>, IEggSource
 
     private static bool GetIsTM(PersonalInfo5BW info, ushort move)
     {
-        var index = Array.IndexOf(TMHM_BW, move);
+        var index = TMHM_BW.IndexOf(move);
         if (index == -1)
             return false;
         return info.GetIsLearnTM(index) && index != 94; // TM95 not available in this game
@@ -106,13 +104,9 @@ public sealed class LearnSource5BW : ILearnSource<PersonalInfo5BW>, IEggSource
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.Machine))

@@ -20,7 +20,7 @@ public static class BatchMods
         new TypeSuggestion<IGeoTrack>(nameof(Extensions.ClearGeoLocationData), p => p.ClearGeoLocationData()),
         new TypeSuggestion<IAwakened>(nameof(AwakeningUtil.AwakeningClear), p => p.AwakeningClear()),
         new TypeSuggestion<IAwakened>(nameof(AwakeningUtil.AwakeningMinimum), p => p.AwakeningMinimum()),
-        new TypeSuggestion<IAwakened>(nameof(AwakeningUtil.AwakeningMax), p => p.AwakeningMax()),
+        new TypeSuggestion<IAwakened>(nameof(AwakeningUtil.AwakeningMaximize), p => p.AwakeningMaximize()),
         new TypeSuggestion<IGanbaru>(nameof(GanbaruExtensions.ClearGanbaruValues), p => p.ClearGanbaruValues()),
         new TypeSuggestion<IGanbaru>(nameof(GanbaruExtensions.SetSuggestedGanbaruValues), p => p.SetSuggestedGanbaruValues((PKM)p)),
 
@@ -41,7 +41,7 @@ public static class BatchMods
         new TypeSuggestion<PKM>(nameof(PKM.Move3_PP), p => p.SetSuggestedMovePP(2)),
         new TypeSuggestion<PKM>(nameof(PKM.Move4_PP), p => p.SetSuggestedMovePP(3)),
 
-        new ComplexSuggestion(nameof(PKM.Moves), (_, _, info) => BatchModifications.SetMoves(info.Entity, info.Legality.GetMoveSet())),
+        new ComplexSuggestion(nameof(PKM.Moves), (_, _, info) => BatchModifications.SetSuggestedMoveset(info)),
         new ComplexSuggestion(PROP_EVS, (_, _, info) => BatchModifications.SetEVs(info.Entity)),
         new ComplexSuggestion(nameof(PKM.RelearnMoves), (_, value, info) => BatchModifications.SetSuggestedRelearnData(info, value)),
         new ComplexSuggestion(PROP_RIBBONS, (_, value, info) => BatchModifications.SetSuggestedRibbons(info, value)),

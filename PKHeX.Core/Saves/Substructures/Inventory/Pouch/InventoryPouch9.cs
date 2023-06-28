@@ -9,9 +9,8 @@ public sealed class InventoryPouch9 : InventoryPouch
     public bool SetNew { get; set; }
     public uint PouchIndex { get; set; }
 
-    public InventoryPouch9(InventoryType type, ushort[] legal, int maxCount, uint pouch,
-        Func<ushort, bool>? isLegal)
-        : base(type, legal, maxCount, 0, isLegal: isLegal)
+    public InventoryPouch9(InventoryType type, IItemStorage info, int maxCount, uint pouch)
+        : base(type, info, maxCount, 0)
     {
         PouchIndex = pouch;
     }
@@ -20,6 +19,7 @@ public sealed class InventoryPouch9 : InventoryPouch
 
     public override void GetPouch(ReadOnlySpan<byte> data)
     {
+        var LegalItems = Info.GetItems(Type);
         var items = new InventoryItem9[LegalItems.Length];
 
         int ctr = 0;
@@ -49,13 +49,13 @@ public sealed class InventoryPouch9 : InventoryPouch
         // Write all the item slots still present in the pouch. Keep track of the item IDs processed.
         var items = (InventoryItem9[])Items;
 
+        var LegalItems = Info.GetItems(Type);
         foreach (var item in items)
         {
             var index = (ushort)item.Index;
             if (index == 0)
                 continue;
-            var isInLegal = Array.IndexOf(LegalItems, index);
-            if (isInLegal == -1)
+            if (!LegalItems.Contains(index))
             {
                 Debug.WriteLine($"Invalid Item ID returned within this pouch: {index}");
                 continue;
@@ -72,8 +72,9 @@ public sealed class InventoryPouch9 : InventoryPouch
             var ofs = GetItemOffset(index);
             item.Write(data[ofs..]);
 
-            if (!processed.Contains(index)) // we will allow duplicate item definitions, but they'll overwrite instead of sum/separate.
-                processed.Add(index);
+            // In the event of duplicates, we just overwrite what was previously written by a prior duplicate.
+            // Don't care if we've already processed this item, just write it again.
+            processed.Add(index);
         }
 
         // For all the items that were not present in the pouch, clear the data for them.

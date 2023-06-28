@@ -12,7 +12,7 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
 {
     public static readonly LearnSource7GG Instance = new();
     private static readonly PersonalTable7GG Personal = PersonalTable.GG;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpGG;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_gg.pkl"), "gg"));
     private const int MaxSpecies = Legal.MaxSpeciesID_7b;
     private const LearnEnvironment Game = GG;
     private const int ReminderBonus = 100; // Move reminder allows re-learning ALL level up moves regardless of level.
@@ -38,7 +38,7 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
                 return new(LevelUp, Game, (byte)level);
         }
 
-        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(Array.IndexOf(TMHM_GG, move)))
+        if (types.HasFlag(MoveSourceType.Machine) && pi.GetIsLearnTM(TMHM_GG.IndexOf(move)))
             return new(TMHM, Game);
 
         if (types.HasFlag(MoveSourceType.EnhancedTutor) && GetIsEnhancedTutor(evo.Species, evo.Form, move))
@@ -50,9 +50,9 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
     private static bool GetIsEnhancedTutor(ushort species, byte form, ushort move)
     {
         if (species == (int)Species.Pikachu && form == 8) // Partner
-            return Tutor_StarterPikachu.AsSpan().Contains(move);
+            return Tutor_StarterPikachu.Contains(move);
         if (species == (int)Species.Eevee && form == 1) // Partner
-            return Tutor_StarterEevee.AsSpan().Contains(move);
+            return Tutor_StarterEevee.Contains(move);
         return false;
     }
 
@@ -64,13 +64,9 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(ReminderBonus);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(ReminderBonus);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.Machine))
@@ -91,7 +87,7 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
         }
     }
 
-    private static readonly ushort[] TMHM_GG =
+    private static ReadOnlySpan<ushort> TMHM_GG => new ushort[]
     {
         029, 269, 270, 100, 156, 113, 182, 164, 115, 091,
         261, 263, 280, 019, 069, 086, 525, 369, 231, 399,
@@ -104,7 +100,7 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
         // No HMs
     };
 
-    private static readonly ushort[] Tutor_StarterPikachu =
+    private static ReadOnlySpan<ushort> Tutor_StarterPikachu => new ushort[]
     {
         (int)Move.ZippyZap,
         (int)Move.SplishySplash,
@@ -112,7 +108,7 @@ public sealed class LearnSource7GG : ILearnSource<PersonalInfo7GG>
         //(int)Move.PikaPapow, // Joycon Shake
     };
 
-    private static readonly ushort[] Tutor_StarterEevee =
+    private static ReadOnlySpan<ushort> Tutor_StarterEevee => new ushort[]
     {
         (int)Move.BouncyBubble,
         (int)Move.BuzzyBuzz,

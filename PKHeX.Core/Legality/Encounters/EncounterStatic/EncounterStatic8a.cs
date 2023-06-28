@@ -87,8 +87,8 @@ public sealed record EncounterStatic8a(GameVersion Version) : EncounterStatic(Ve
     protected override bool IsMatchLocation(PKM pk)
     {
         if (pk is PK8)
-            return pk.Met_Location == Locations.HOME_SWLA;
-        if (pk is PB8 { Version: (int)GameVersion.PLA, Met_Location: Locations.HOME_SWLA })
+            return pk.Met_Location == LocationsHOME.SWLA;
+        if (pk is PB8 { Version: (int)GameVersion.PLA, Met_Location: LocationsHOME.SWLA })
             return true;
 
         return base.IsMatchLocation(pk);
@@ -115,6 +115,9 @@ public sealed record EncounterStatic8a(GameVersion Version) : EncounterStatic(Ve
         if (!IsForcedMasteryCorrect(pk))
             return EncounterMatchRating.DeferredErrors;
 
+        if (!MarkRules.IsMarkValidAlpha(pk, IsAlpha))
+            return EncounterMatchRating.DeferredErrors;
+
         if (IsAlpha && pk is PA8 { AlphaMove: 0 })
             return EncounterMatchRating.Deferred;
 
@@ -135,13 +138,11 @@ public sealed record EncounterStatic8a(GameVersion Version) : EncounterStatic(Ve
 
         const bool allowAlphaPurchaseBug = true; // Everything else Alpha is pre-1.1
         var level = pk.Met_Level;
-        var index = PersonalTable.LA.GetFormIndex(Species, Form);
-        var learn = Legal.LevelUpLA[index];
+        var (learn, mastery) = GetLevelUpInfo();
         if (!p.IsValidPurchasedEncounter(learn, level, alpha, allowAlphaPurchaseBug))
             return false;
 
         Span<ushort> moves = stackalloc ushort[4];
-        var mastery = Legal.MasteryLA[index];
         if (Moves.HasMoves)
             Moves.CopyTo(moves);
         else
@@ -165,10 +166,7 @@ public sealed record EncounterStatic8a(GameVersion Version) : EncounterStatic(Ve
 
     public (Learnset Learn, Learnset Mastery) GetLevelUpInfo()
     {
-        var index = PersonalTable.LA.GetFormIndex(Species, Form);
-        var learn = Legal.LevelUpLA[index];
-        var mastery = Legal.MasteryLA[index];
-        return (learn, mastery);
+        return LearnSource8LA.GetLearnsetAndMastery(Species, Form);
     }
 
     public void LoadInitialMoveset(PA8 pa8, Span<ushort> moves, Learnset learn, int level)

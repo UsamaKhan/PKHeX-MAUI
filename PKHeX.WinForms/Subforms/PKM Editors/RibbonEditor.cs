@@ -145,7 +145,7 @@ public partial class RibbonEditor : Form
         var pb = new SelectablePictureBox
         {
             AutoSize = false,
-            Size = new Size(40,40),
+            Size = new Size(40, 40),
             BackgroundImageLayout = ImageLayout.Center,
             Visible = false,
             Name = PrefixPB + name,
@@ -158,6 +158,8 @@ public partial class RibbonEditor : Form
 
         var display = RibbonStrings.GetName(name);
         pb.MouseEnter += (s, e) => tipName.SetToolTip(pb, display);
+        if (Entity is IRibbonSetAffixed)
+            pb.Click += (_, _) => CB_Affixed.Text = RibbonStrings.GetName(name);
         FLP_Ribbons.Controls.Add(pb);
     }
 
@@ -233,8 +235,7 @@ public partial class RibbonEditor : Form
             rib.HasRibbon = chk.Checked;
             var controlName = PrefixPB + rib.Name;
             var control = FLP_Ribbons.Controls[controlName];
-            if (control is null)
-                throw new ArgumentException($"{controlName} not found in {FLP_Ribbons.Name}.");
+            ArgumentNullException.ThrowIfNull(control);
             control.Visible = rib.HasRibbon;
 
             ToggleNewRibbon(rib, control);

@@ -12,8 +12,6 @@ public sealed record EncounterArea8b : EncounterArea
 {
     public readonly EncounterSlot8b[] Slots;
 
-    protected override IReadOnlyList<EncounterSlot8b> Raw => Slots;
-
     public static EncounterArea8b[] GetAreas(BinLinkerAccessor input, GameVersion game)
     {
         var result = new EncounterArea8b[input.Length];
@@ -81,7 +79,7 @@ public sealed record EncounterArea8b : EncounterArea
         return false;
     }
 
-    public override IEnumerable<EncounterSlot8b> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
+    public IEnumerable<EncounterSlot8b> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
     {
         foreach (var slot in Slots)
         {
@@ -121,7 +119,7 @@ public sealed record EncounterArea8b : EncounterArea
                && LocationID_HoneyTree[trees.Tree4] != location;
     }
 
-    private static readonly ushort[] LocationID_HoneyTree =
+    private static ReadOnlySpan<ushort> LocationID_HoneyTree => new ushort[]
     {
         359, // 00 Route 205 Floaroma
         361, // 01 Route 205 Eterna

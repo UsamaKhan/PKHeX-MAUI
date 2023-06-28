@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
@@ -18,7 +17,7 @@ public abstract class GBPKM : PKM
     public sealed override int MaxIV => 15;
     public sealed override int MaxEV => ushort.MaxValue;
 
-    public sealed override IReadOnlyList<ushort> ExtraBytes => Array.Empty<ushort>();
+    public sealed override ReadOnlySpan<ushort> ExtraBytes => ReadOnlySpan<ushort>.Empty;
 
     protected GBPKM(int size) : base(size) { }
     protected GBPKM(byte[] data) : base(data) { }
@@ -31,13 +30,24 @@ public abstract class GBPKM : PKM
     public override bool Valid { get => true; set { } }
     public sealed override void RefreshChecksum() { }
 
-    protected abstract byte[] GetNonNickname(int language);
-
     private bool? _isnicknamed;
+    protected abstract void GetNonNickname(int language, Span<byte> data);
 
     public sealed override bool IsNicknamed
     {
-        get => _isnicknamed ??= !Nickname_Trash.SequenceEqual(GetNonNickname(GuessedLanguage()));
+        get
+        {
+            if (_isnicknamed is {} actual)
+                return actual;
+
+            var current = Nickname_Trash;
+            Span<byte> expect = stackalloc byte[current.Length];
+            var language = GuessedLanguage();
+            GetNonNickname(language, expect);
+            var result = !current.SequenceEqual(expect);
+            _isnicknamed = result;
+            return result;
+        }
         set
         {
             _isnicknamed = value;
@@ -214,7 +224,13 @@ public abstract class GBPKM : PKM
 
     protected static ushort GetStat(int baseStat, int iv, int effort, int level)
     {
-        effort = (ushort)Math.Min(255, Math.Sqrt(effort) + 1) >> 2;
+        // The games store a precomputed ushort[256] i*i table for all ushort->byte square root calcs.
+        // The game then iterates to find the lowest index with a value >= input (effort).
+        // With modern CPUs we can just call sqrt->ceil directly.
+        // ceil(sqrt(65535)) evals to 256, but we're clamped to byte only.
+        byte firstSquare = (byte)Math.Min(255, Math.Ceiling(Math.Sqrt(effort)));
+
+        effort = firstSquare >> 2;
         return (ushort)((((2 * (baseStat + iv)) + effort) * level / 100) + 5);
     }
 

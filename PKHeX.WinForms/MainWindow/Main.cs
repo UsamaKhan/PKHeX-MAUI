@@ -27,6 +27,8 @@ public partial class Main : Form
         FormLoadInitialSettings(args, out bool showChangelog, out bool BAKprompt);
 
         InitializeComponent();
+        if (Settings.Display.DisableScalingDpi)
+            AutoScaleMode = AutoScaleMode.Font;
         C_SAV.SetEditEnvironment(new SaveDataEditor<PictureBox>(new FakeSaveFile(), PKME_Tabs));
         FormLoadAddEvents();
 #if DEBUG // translation updater -- all controls are added at this point -- call translate now
@@ -593,6 +595,7 @@ public partial class Main : Form
                 var mcsav = SaveUtil.GetVariantSAV(gc);
                 if (mcsav is null)
                     return false;
+                mcsav.Metadata.SetExtraInfo(path);
                 return OpenSAV(mcsav, path);
         }
         return false;
@@ -670,9 +673,9 @@ public partial class Main : Form
     private static List<ComboItem> GetMemoryCardGameSelectionList(SAV3GCMemoryCard memCard)
     {
         var games = new List<ComboItem>();
-        if (memCard.HasCOLO) games.Add(new ComboItem(MsgGameColosseum, (int) GameVersion.COLO));
-        if (memCard.HasXD) games.Add(new ComboItem(MsgGameXD, (int) GameVersion.XD));
-        if (memCard.HasRSBOX) games.Add(new ComboItem(MsgGameRSBOX, (int) GameVersion.RSBOX));
+        if (memCard.HasCOLO) games.Add(new ComboItem(MsgGameColosseum, (int)GameVersion.COLO));
+        if (memCard.HasXD) games.Add(new ComboItem(MsgGameXD, (int)GameVersion.XD));
+        if (memCard.HasRSBOX) games.Add(new ComboItem(MsgGameRSBOX, (int)GameVersion.RSBOX));
         return games;
     }
 
@@ -698,8 +701,8 @@ public partial class Main : Form
                 memCard.SelectSaveGame(game);
                 break;
 
-            case GCMemoryCardState.SaveGameCOLO:  memCard.SelectSaveGame(GameVersion.COLO);  break;
-            case GCMemoryCardState.SaveGameXD:    memCard.SelectSaveGame(GameVersion.XD);    break;
+            case GCMemoryCardState.SaveGameCOLO: memCard.SelectSaveGame(GameVersion.COLO); break;
+            case GCMemoryCardState.SaveGameXD: memCard.SelectSaveGame(GameVersion.XD); break;
             case GCMemoryCardState.SaveGameRSBOX: memCard.SelectSaveGame(GameVersion.RSBOX); break;
 
             default:
@@ -1063,7 +1066,7 @@ public partial class Main : Form
             if (dr != DialogResult.Yes)
                 return;
 #if DEBUG
-            var enc = SummaryPreviewer.GetTextLines(la.EncounterOriginal);
+            var enc = la.EncounterOriginal.GetTextLines();
             report += Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, enc);
 #endif
             WinFormsUtil.SetClipboardText(report);
@@ -1274,7 +1277,7 @@ public partial class Main : Form
             WinFormsUtil.Alert(MsgBackupSuccess, string.Format(MsgBackupDelete, BackupPath));
         }
         catch (Exception ex)
-            // Maybe they put their exe in a folder that we can't create files/folders to.
+        // Maybe they put their exe in a folder that we can't create files/folders to.
         { WinFormsUtil.Error($"{MsgBackupUnable} @ {BackupPath}", ex); }
     }
 

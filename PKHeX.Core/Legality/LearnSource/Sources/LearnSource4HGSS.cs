@@ -13,12 +13,11 @@ public sealed class LearnSource4HGSS : ILearnSource<PersonalInfo4>, IEggSource
 {
     public static readonly LearnSource4HGSS Instance = new();
     private static readonly PersonalTable4 Personal = PersonalTable.HGSS;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpHGSS;
-    private static readonly EggMoves6[] EggMoves = Legal.EggMovesHGSS;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_hgss.pkl"), "hs"));
+    private static readonly EggMoves6[] EggMoves = EggMoves6.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_hgss.pkl"), "hs"));
     private const int MaxSpecies = Legal.MaxSpeciesID_4;
     private const LearnEnvironment Game = HGSS;
     private const int Generation = 4;
-    private const int CountTM = 92;
 
     public Learnset GetLearnset(ushort species, byte form) => Learnsets[Personal.GetFormIndex(species, form)];
 
@@ -86,18 +85,18 @@ public sealed class LearnSource4HGSS : ILearnSource<PersonalInfo4>, IEggSource
         _ => false,
     };
 
-    private static bool GetIsTypeTutor(ushort species, ushort move)
+    private static bool GetIsTypeTutor(ushort species, ushort move) => move switch
     {
-        var index = Array.IndexOf(SpecialTutors_4, move);
-        if (index == -1)
-            return false;
-        var list = SpecialTutors_Compatibility_4[index];
-        return Array.IndexOf(list, species) != -1;
-    }
+        (ushort)Move.BlastBurn => SpecialTutors_Compatibility_4_BlastBurn.Contains(species),
+        (ushort)Move.HydroCannon => SpecialTutors_Compatibility_4_HydroCannon.Contains(species),
+        (ushort)Move.FrenzyPlant => SpecialTutors_Compatibility_4_FrenzyPlant.Contains(species),
+        (ushort)Move.DracoMeteor => SpecialTutors_Compatibility_4_DracoMeteor.Contains(species),
+        _ => false,
+    };
 
     private static bool GetIsSpecialTutor(PersonalInfo4 pi, ushort move)
     {
-        var index = Array.IndexOf(Tutors_4, move);
+        var index = Tutors_4.IndexOf(move);
         if (index == -1)
             return false;
         return pi.TypeTutors[index];
@@ -105,13 +104,13 @@ public sealed class LearnSource4HGSS : ILearnSource<PersonalInfo4>, IEggSource
 
     private static bool GetIsTM(PersonalInfo4 info, ushort move)
     {
-        var index = Array.IndexOf(TM_4, move);
+        var index = TM_4.IndexOf(move);
         return info.GetIsLearnTM(index);
     }
 
     private static bool GetIsHM(PersonalInfo4 info, ushort move)
     {
-        var index = Array.IndexOf(HM_HGSS, move);
+        var index = HM_HGSS.IndexOf(move);
         return info.GetIsLearnHM(index);
     }
 
@@ -123,13 +122,9 @@ public sealed class LearnSource4HGSS : ILearnSource<PersonalInfo4>, IEggSource
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.Machine))
@@ -145,14 +140,14 @@ public sealed class LearnSource4HGSS : ILearnSource<PersonalInfo4>, IEggSource
         if (types.HasFlag(MoveSourceType.TypeTutor))
         {
             // Elemental Beams
-            var species = SpecialTutors_Compatibility_4;
-            var moves = SpecialTutors_4;
-            for (int i = 0; i < species.Length; i++)
-            {
-                var index = Array.IndexOf(species[i], evo.Species);
-                if (index != -1)
-                    result[moves[i]] = true;
-            }
+            if (SpecialTutors_Compatibility_4_BlastBurn.Contains(evo.Species))
+                result[(int)Move.BlastBurn] = true;
+            if (SpecialTutors_Compatibility_4_HydroCannon.Contains(evo.Species))
+                result[(int)Move.HydroCannon] = true;
+            if (SpecialTutors_Compatibility_4_FrenzyPlant.Contains(evo.Species))
+                result[(int)Move.FrenzyPlant] = true;
+            if (SpecialTutors_Compatibility_4_DracoMeteor.Contains(evo.Species))
+                result[(int)Move.DracoMeteor] = true;
         }
 
         if (types.HasFlag(MoveSourceType.SpecialTutor))

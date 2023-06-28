@@ -179,40 +179,11 @@ public sealed class FormVerifier : Verifier
         if (FormInfo.IsBattleOnlyForm(species, form, format))
             return GetInvalid(LFormBattle);
 
-        if (form == 0)
-            return VALID;
-
-        // everything below here is not Form 0, so it has a form.
-        if (format >= 7 && Info.Generation < 7)
-        {
-            if (species == 25 || Legal.AlolanOriginForms.Contains(species) || Legal.AlolanVariantEvolutions12.Contains(enc.Species))
-                return GetInvalid(LFormInvalidGame);
-        }
-        if (format >= 8 && Info.Generation < 8)
-        {
-            var orig = enc.Species;
-            if (Legal.GalarOriginForms.Contains(species) || Legal.GalarVariantFormEvolutions.Contains(orig))
-            {
-                if (species == (int)Meowth && enc.Form != 2)
-                {
-                    // We're okay here. There's also Alolan Meowth...
-                }
-                else if (((Species)orig is MrMime or MimeJr) && pk.CurrentLevel > enc.LevelMin && Info.Generation >= 4)
-                {
-                    // We're okay with a Mime Jr. that has evolved via level up.
-                }
-                else if (enc.Version != GameVersion.GO)
-                {
-                    return GetInvalid(LFormInvalidGame);
-                }
-            }
-        }
-
         return VALID;
     }
 
-    private static readonly ushort[] Arceus_PlateIDs = { 303, 306, 304, 305, 309, 308, 310, 313, 298, 299, 301, 300, 307, 302, 311, 312, 644 };
-    private static readonly ushort[] Arceus_ZCrystal = { 782, 785, 783, 784, 788, 787, 789, 792, 777, 778, 780, 779, 786, 781, 790, 791, 793 };
+    private static ReadOnlySpan<ushort> Arceus_PlateIDs => new ushort[] { 303, 306, 304, 305, 309, 308, 310, 313, 298, 299, 301, 300, 307, 302, 311, 312, 644 };
+    private static ReadOnlySpan<ushort> Arceus_ZCrystal => new ushort[] { 782, 785, 783, 784, 788, 787, 789, 792, 777, 778, 780, 779, 786, 781, 790, 791, 793 };
 
     public static byte GetArceusFormFromHeldItem(int item, int format) => item switch
     {
@@ -223,12 +194,12 @@ public sealed class FormVerifier : Verifier
 
     private static byte GetArceusFormFromZCrystal(int item)
     {
-        return (byte)(Array.IndexOf(Arceus_ZCrystal, (ushort)item) + 1);
+        return (byte)(Arceus_ZCrystal.IndexOf((ushort)item) + 1);
     }
 
     private static byte GetArceusFormFromPlate(int item, int format)
     {
-        byte form = (byte)(Array.IndexOf(Arceus_PlateIDs, (ushort)item) + 1);
+        byte form = (byte)(Arceus_PlateIDs.IndexOf((ushort)item) + 1);
         if (format != 4) // No need to consider Curse type
             return form;
         if (form < 9)
@@ -288,12 +259,6 @@ public sealed class FormVerifier : Verifier
                 > 9_999 => GetInvalid(LFormArgumentHigh),
                 _ => GetValid(LFormArgumentValid),
             },
-            Gimmighoul => arg switch
-            {
-                not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
-                > 9_999 => GetInvalid(LFormArgumentHigh),
-                _ => GetValid(LFormArgumentValid),
-            },
             Stantler => arg switch
             {
                 not 0 when pk.IsEgg => GetInvalid(LFormArgumentNotAllowed),
@@ -311,14 +276,22 @@ public sealed class FormVerifier : Verifier
                 > 9_999 => GetInvalid(LFormArgumentHigh),
                 _ => arg == 0 || HasVisitedSV(data, Bisharp) ? GetValid(LFormArgumentValid) : GetInvalid(LFormArgumentNotAllowed),
             },
+            Gimmighoul => arg switch
+            {
+                // Leveling up sets the save file's current coin count to the arg. If 999+, triggers level up.
+                // Without leveling up, cannot have a form arg value.
+                >= 999 => GetInvalid(LFormArgumentHigh),
+                0 => GetValid(LFormArgumentValid),
+                _ => pk.CurrentLevel != pk.Met_Level ? GetValid(LFormArgumentValid) : GetInvalid(LFormArgumentNotAllowed),
+            },
             Runerigus   => VerifyFormArgumentRange(enc.Species, Runerigus,   arg,  49, 9999),
             Alcremie    => VerifyFormArgumentRange(enc.Species, Alcremie,    arg,   0, (uint)AlcremieDecoration.Ribbon),
             Wyrdeer     => VerifyFormArgumentRange(enc.Species, Wyrdeer,     arg,  20, 9999),
             Basculegion => VerifyFormArgumentRange(enc.Species, Basculegion, arg, 294, 9999),
             Overqwil    => VerifyFormArgumentRange(enc.Species, Overqwil,    arg,  20, 9999),
-            Gholdengo   => VerifyFormArgumentRange(enc.Species, Gholdengo,   arg, 999,  999),
-            Kingambit   => VerifyFormArgumentRange(enc.Species, Kingambit,   arg,   3, 9999),
             Annihilape  => VerifyFormArgumentRange(enc.Species, Annihilape,  arg,  20, 9999),
+            Kingambit   => VerifyFormArgumentRange(enc.Species, Kingambit,   arg,   3, 9999),
+            Gholdengo   => VerifyFormArgumentRange(enc.Species, Gholdengo,   arg, 999,  999),
             Koraidon or Miraidon => enc switch
             {
                 // Starter Legend has '1' when present in party, to differentiate.

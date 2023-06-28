@@ -8,11 +8,9 @@ namespace PKHeX.Core;
 /// <summary>
 /// <see cref="GameVersion.ORAS"/> encounter area
 /// </summary>
-public sealed record EncounterArea6AO : EncounterArea
+public sealed record EncounterArea6AO : EncounterArea, IMemorySpeciesArea
 {
     public readonly EncounterSlot6AO[] Slots;
-
-    protected override IReadOnlyList<EncounterSlot6AO> Raw => Slots;
 
     public static EncounterArea6AO[] GetAreas(BinLinkerAccessor input, GameVersion game)
     {
@@ -59,7 +57,7 @@ public sealed record EncounterArea6AO : EncounterArea
     private const int FluteBoostMax = 4; // Black Flute increases levels.
     private const int DexNavBoost = 30; // Maximum DexNav chain
 
-    public override IEnumerable<EncounterSlot6AO> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
+    public IEnumerable<EncounterSlot6AO> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
     {
         foreach (var slot in Slots)
         {
@@ -87,5 +85,15 @@ public sealed record EncounterArea6AO : EncounterArea
                 break;
             }
         }
+    }
+
+    public bool HasSpecies(ushort species)
+    {
+        foreach (var slot in Slots)
+        {
+            if (slot.Species == species)
+                return true;
+        }
+        return false;
     }
 }

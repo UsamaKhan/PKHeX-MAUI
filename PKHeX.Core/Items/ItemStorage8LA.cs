@@ -2,18 +2,11 @@ using System;
 
 namespace PKHeX.Core;
 
-public static partial class Legal
+public sealed class ItemStorage8LA : IItemStorage
 {
-    internal const int MaxSpeciesID_8a = (int)Species.Enamorus;
-    internal const int MaxMoveID_8a = (int)Move.TakeHeart;
-    internal const int MaxItemID_8a = 1828; // Legend Plate
-    internal const int MaxBallID_8a = (int)Ball.LAOrigin;
-    internal const int MaxGameID_8a = (int)GameVersion.SP;
-    internal const int MaxAbilityID_8a = MaxAbilityID_8_R2;
+    public static readonly ItemStorage8LA Instance = new();
 
-    internal static readonly ushort[] HeldItems_LA = Array.Empty<ushort>();
-
-    internal static readonly ushort[] Pouch_Items_LA =
+    private static ReadOnlySpan<ushort> Pouch_Items_LA => new ushort[]
     {
         017, 023, 024, 025, 026, 027, 028, 029, 039, 041,
         050, 054, 072, 073, 075, 080, 081, 082, 083, 084,
@@ -37,7 +30,7 @@ public static partial class Legal
         1760, 1761, 1762, 1764, 1785,
     };
 
-    internal static readonly ushort[] Pouch_Recipe_LA =
+    private static ReadOnlySpan<ushort> Pouch_Recipe_LA => new ushort[]
     {
         1640, 1641, 1642, 1643, 1644,       1646, 1647, 1648, 1649,
         1650,       1652, 1653, 1654, 1655, 1656, 1657, 1658, 1659,
@@ -52,7 +45,7 @@ public static partial class Legal
         1783, 1784,
     };
 
-    internal static readonly ushort[] Pouch_Key_LA =
+    private static ReadOnlySpan<ushort> Pouch_Key_LA => new ushort[]
     {
         111,
         298, 299,
@@ -67,5 +60,17 @@ public static partial class Legal
         1795, 1796, 1797, 1798, 1799, 1800, 1801, 1802, 1803, 1804,
         1805, 1806, 1807,
         1828,
+    };
+
+    public bool IsLegal(InventoryType type, int itemIndex, int itemCount) => GetItems(type).BinarySearch((ushort)itemIndex) >= 0;
+
+    public ReadOnlySpan<ushort> GetItems(InventoryType type) => type switch
+    {
+
+        InventoryType.Items => Pouch_Items_LA,
+        InventoryType.KeyItems => Pouch_Key_LA,
+        InventoryType.PCItems => Pouch_Items_LA,
+        InventoryType.Treasure => Pouch_Recipe_LA,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace PKHeX.Core.Bulk;
 
@@ -19,8 +18,14 @@ public sealed class BulkAnalysis
     public readonly IBulkAnalysisSettings Settings;
     private readonly bool[] CloneFlags;
 
+    /// <summary>
+    /// Checks if the <see cref="AllData"/> entity at <see cref="entryIndex"/> was previously marked as a clone of another index.
+    /// </summary>
     public bool GetIsClone(int entryIndex) => CloneFlags[entryIndex];
 
+    /// <summary>
+    /// Marks the <see cref="AllData"/> entity at <see cref="entryIndex"/> as a clone of another index.
+    /// </summary>
     public bool SetIsClone(int entryIndex, bool value = true) => CloneFlags[entryIndex] = value;
 
     public BulkAnalysis(SaveFile sav, IBulkAnalysisSettings settings)
@@ -35,7 +40,7 @@ public sealed class BulkAnalysis
         CloneFlags = new bool[AllData.Count];
 
         ScanAll();
-        Valid = Parse.Count == 0 || Parse.All(z => z.Valid);
+        Valid = Parse.Count == 0 || Parse.TrueForAll(static z => z.Valid);
     }
 
     // Remove things that aren't actual stored data, or already flagged by legality checks.
@@ -49,6 +54,9 @@ public sealed class BulkAnalysis
         return false;
     }
 
+    /// <summary>
+    /// Supported <see cref="IBulkAnalyzer"/> checkers that will be iterated through to check all entities.
+    /// </summary>
     public static readonly List<IBulkAnalyzer> Analyzers = new()
     {
         new StandardCloneChecker(),
@@ -67,17 +75,23 @@ public sealed class BulkAnalysis
 
     private static string GetSummary(SlotCache entry) => $"[{entry.Identify()}]";
 
+    /// <summary>
+    /// Adds a new entry to the <see cref="Parse"/> list.
+    /// </summary>
     public void AddLine(SlotCache first, SlotCache second, string msg, CheckIdentifier i, Severity s = Severity.Invalid)
     {
         var c = $"{msg}{Environment.NewLine}{GetSummary(first)}{Environment.NewLine}{GetSummary(second)}{Environment.NewLine}";
-        var chk = new CheckResult(s, c, i);
+        var chk = new CheckResult(s, i, c);
         Parse.Add(chk);
     }
 
+    /// <summary>
+    /// Adds a new entry to the <see cref="Parse"/> list.
+    /// </summary>
     public void AddLine(SlotCache first, string msg, CheckIdentifier i, Severity s = Severity.Invalid)
     {
         var c = $"{msg}{Environment.NewLine}{GetSummary(first)}{Environment.NewLine}";
-        var chk = new CheckResult(s, c, i);
+        var chk = new CheckResult(s, i, c);
         Parse.Add(chk);
     }
 

@@ -1,4 +1,4 @@
-using System.Linq;
+using System;
 using FluentAssertions;
 using Xunit;
 using static PKHeX.Core.Species;
@@ -8,6 +8,7 @@ namespace PKHeX.Core.Tests.Legality;
 
 public static class TempTests
 {
+    // BD/SP has egg moves that cannot be obtained because no parents in the egg group can know the move.
     [Theory]
     [InlineData(Taillow, Boomburst)]
     [InlineData(Plusle, TearfulLook)] [InlineData(Minun, TearfulLook)]
@@ -17,11 +18,11 @@ public static class TempTests
     [InlineData(Spiritomb, FoulPlay)]
     public static void CanLearnEggMoveBDSP(Species species, Move move)
     {
-        MoveEgg.GetEggMoves(8, (ushort)species, 0, GameVersion.BD).Contains((ushort)move).Should().BeFalse();
+        LearnSource8BDSP.Instance.GetEggMoves((ushort)species, 0).Contains((ushort)move).Should().BeFalse();
 
         var pb8 = new PB8 { Species = (ushort)species };
         var encs = EncounterMovesetGenerator.GenerateEncounters(pb8, new[] { (ushort)move }, GameVersion.BD);
 
-        encs.Any().Should().BeFalse("Unavailable until HOME update supports BD/SP.");
+        encs.Should().BeEmpty("HOME supports BD/SP, but does not make any disconnected moves available.");
     }
 }

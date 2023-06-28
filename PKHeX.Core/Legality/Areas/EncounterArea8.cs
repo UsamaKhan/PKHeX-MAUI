@@ -10,11 +10,10 @@ namespace PKHeX.Core;
 /// <summary>
 /// <see cref="GameVersion.SWSH"/> encounter area
 /// </summary>
-public sealed record EncounterArea8 : EncounterArea
+public sealed record EncounterArea8 : EncounterArea, IMemorySpeciesArea
 {
     public readonly EncounterSlot8[] Slots;
 
-    protected override IReadOnlyList<EncounterSlot8> Raw => Slots;
     /// <summary>
     /// Slots from this area can cross over to another area, resulting in a different met location.
     /// </summary>
@@ -39,7 +38,7 @@ public sealed record EncounterArea8 : EncounterArea
         return Array.IndexOf(others, (byte)location) != -1;
     }
 
-    public override IEnumerable<EncounterSlot8> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
+    public IEnumerable<EncounterSlot8> GetMatchingSlots(PKM pk, EvoCriteria[] chain)
     {
         var metLocation = pk.Met_Location;
         // wild area gets boosted up to level 60 post-game
@@ -403,6 +402,16 @@ public sealed record EncounterArea8 : EncounterArea
 
         return slots;
     }
+
+    public bool HasSpecies(ushort species)
+    {
+        foreach (var slot in Slots)
+        {
+            if (slot.Species == species)
+                return true;
+        }
+        return false;
+    }
 }
 
 /// <summary>
@@ -437,6 +446,9 @@ public enum AreaWeather8 : ushort
     NotWeather = Shaking_Trees | Fishing,
 }
 
+/// <summary>
+/// Extension methods for <see cref="AreaWeather8"/>.
+/// </summary>
 public static class AreaWeather8Extensions
 {
     public static bool IsMarkCompatible(this AreaWeather8 weather, IRibbonSetMark8 m)
@@ -477,6 +489,9 @@ public enum AreaSlotType8 : byte
     Inaccessible, // Shouldn't show up since these tables are not dumped.
 }
 
+/// <summary>
+/// Extension methods for <see cref="AreaSlotType8"/>.
+/// </summary>
 public static class AreaSlotType8Extensions
 {
     public static bool CanCrossover(this AreaSlotType8 type) => type is not (HiddenMain or HiddenMain2 or OnlyFishing);

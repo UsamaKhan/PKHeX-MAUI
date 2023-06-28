@@ -95,14 +95,20 @@ public sealed record EncounterSlot8GO : EncounterSlotGO, IFixedOTFriendship
         {
             s.HeightScalar = PokeSizeUtil.GetRandomScalar();
             s.WeightScalar = PokeSizeUtil.GetRandomScalar();
+            if (pk is IScaledSize3 s3)
+                s3.Scale = s.HeightScalar = PokeSizeUtil.GetRandomScalar();
         }
 
-        if (OriginFormat is PogoImportFormat.PA8)
+        if (pk is PA8 pa8)
         {
-            var pa8 = (PA8)pk;
             pa8.ResetHeight();
             pa8.ResetWeight();
-            pa8.Scale = pa8.HeightScalar;
+        }
+        else if (pk is PK9 pk9)
+        {
+            var pi = pk9.PersonalInfo;
+            pk9.TeraTypeOriginal = pk9.TeraTypeOverride = TeraTypeUtil.GetTeraTypeImport(pi.Type1, pi.Type2);
+            pk9.Obedience_Level = (byte)pk9.Met_Level;
         }
 
         pk.OT_Friendship = OT_Friendship;
@@ -139,7 +145,11 @@ public sealed record EncounterSlot8GO : EncounterSlotGO, IFixedOTFriendship
         pk.SetMaximumPPCurrent(moves);
     }
 
-    public void GetInitialMoves(int level, Span<ushort> moves) => MoveLevelUp.GetEncounterMoves(moves, Species, Form, level, OriginGroup);
+    public void GetInitialMoves(int level, Span<ushort> moves)
+    {
+        var source = GameData.GetLearnSource(OriginGroup);
+        source.SetEncounterMoves(Species, Form, level, moves);
+    }
 
     public override EncounterMatchRating GetMatchRating(PKM pk)
     {
@@ -196,9 +206,9 @@ public sealed record EncounterSlot8GO : EncounterSlotGO, IFixedOTFriendship
         (int)Wyrdeer     => pk is IFormArgument { FormArgument: not 0 },
         (int)Overqwil    => pk is IFormArgument { FormArgument: not 0 },
         (int)Basculegion => pk is IFormArgument { FormArgument: not 0 },
-        (int)Gholdengo   => pk is IFormArgument { FormArgument: not 0 },
-        (int)Kingambit   => pk is IFormArgument { FormArgument: not 0 },
         (int)Annihilape  => pk is IFormArgument { FormArgument: not 0 },
+        (int)Kingambit   => pk is IFormArgument { FormArgument: not 0 },
+        (int)Gholdengo   => pk is IFormArgument { FormArgument: not 0 },
 
         // No Form Argument relevant to check
         _ => false,

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -127,7 +126,7 @@ public sealed class PK1 : GBPKML, IPersonalType
     public override int Version { get => (int)GameVersion.RBY; set { } }
     public override int PKRS_Strain { get => 0; set { } }
     public override int PKRS_Days { get => 0; set { } }
-    public override bool CanHoldItem(IReadOnlyList<ushort> valid) => false;
+    public override bool CanHoldItem(ReadOnlySpan<ushort> valid) => false;
     public override int Met_Location { get => 0; set { } }
     public override int OT_Gender { get => 0; set { } }
     public override int Met_Level { get => 0; set { } }
@@ -148,9 +147,9 @@ public sealed class PK1 : GBPKML, IPersonalType
     public PK2 ConvertToPK2()
     {
         PK2 pk2 = new(Japanese) {Species = Species};
-        Array.Copy(Data, 0x7, pk2.Data, 0x1, 0x1A);
-        RawOT.CopyTo(pk2.RawOT, 0);
-        RawNickname.CopyTo(pk2.RawNickname, 0);
+        Data.AsSpan(7, 0x1A).CopyTo(pk2.Data.AsSpan(1));
+        OT_Trash.CopyTo(pk2.OT_Trash);
+        Nickname_Trash.CopyTo(pk2.Nickname_Trash);
 
         pk2.HeldItem = Gen2Item;
         pk2.CurrentFriendship = pk2.PersonalInfo.BaseFriendship;
@@ -185,7 +184,6 @@ public sealed class PK1 : GBPKML, IPersonalType
             Move4_PPUps = Move4_PPUps,
             Met_Location = Locations.Transfer1, // "Kanto region", hardcoded.
             Gender = Gender,
-            OT_Name = StringConverter12Transporter.GetString(RawOT, Japanese),
             IsNicknamed = false,
 
             CurrentHandler = 1,
@@ -198,8 +196,7 @@ public sealed class PK1 : GBPKML, IPersonalType
         var lang = TransferLanguage(RecentTrainerCache.Language);
         pk7.Language = lang;
         pk7.Nickname = SpeciesName.GetSpeciesNameGeneration(pk7.Species, lang, pk7.Format);
-        if (RawOT[0] == StringConverter12.G1TradeOTCode) // In-game Trade
-            pk7.OT_Name = StringConverter12.G1TradeOTName[lang];
+        pk7.OT_Name = OT_Trash[0] != StringConverter12.G1TradeOTCode ? StringConverter12Transporter.GetString(OT_Trash, Japanese) : StringConverter12.G1TradeOTName[lang]; // In-game Trade
         pk7.OT_Friendship = pk7.HT_Friendship = PersonalTable.SM[Species].BaseFriendship;
 
         // IVs
@@ -209,7 +206,7 @@ public sealed class PK1 : GBPKML, IPersonalType
             finalIVs[i] = rnd.Next(32);
         for (var i = 0; i < flawless; i++)
             finalIVs[i] = 31;
-        Util.Shuffle(finalIVs);
+        rnd.Shuffle(finalIVs);
         pk7.SetIVs(finalIVs);
 
         switch (IsShiny ? Shiny.Always : Shiny.Never)
@@ -233,7 +230,7 @@ public sealed class PK1 : GBPKML, IPersonalType
         else if (IsNicknamedBank)
         {
             pk7.IsNicknamed = true;
-            pk7.Nickname = StringConverter12Transporter.GetString(RawNickname, Japanese);
+            pk7.Nickname = StringConverter12Transporter.GetString(Nickname_Trash, Japanese);
         }
 
         pk7.SetTradeMemoryHT6(bank:true); // oh no, memories on gen7 pk

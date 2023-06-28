@@ -8,6 +8,9 @@ namespace PKHeX.Core;
 /// </summary>
 public sealed class GameDataSource
 {
+    /// <summary>
+    /// List of <see cref="Region3DSIndex"/> values to display.
+    /// </summary>
     public static readonly IReadOnlyList<ComboItem> Regions = new List<ComboItem>
     {
         new ("Japan (日本)",      0),
@@ -18,6 +21,9 @@ public sealed class GameDataSource
         new ("Taiwan (香港/台灣)", 6),
     };
 
+    /// <summary>
+    /// List of <see cref="LanguageID"/> values to display.
+    /// </summary>
     private static readonly List<ComboItem> LanguageList = new()
     {
         new ComboItem("JPN (日本語)",   (int)LanguageID.Japanese),
@@ -77,6 +83,10 @@ public sealed class GameDataSource
     public readonly IReadOnlyList<ComboItem> HaXMoveDataSource;
     public readonly IReadOnlyList<ComboItem> GroundTileDataSource;
 
+    /// <summary>
+    /// Preferentially ordered list of <see cref="GameVersion"/> values to display in a list.
+    /// </summary>
+    /// <remarks>Most recent games are at the top, loosely following Generation groups.</remarks>
     private static ReadOnlySpan<byte> OrderedVersionArray => new byte[]
     {
         50, 51, // 9 sv
@@ -103,13 +113,11 @@ public sealed class GameDataSource
         00,
     };
 
-    private static IReadOnlyList<ComboItem> GetBalls(string[] itemList)
-    {
-        // ignores Poke/Great/Ultra
-        ReadOnlySpan<ushort> ball_nums = stackalloc ushort[] { 007, 576, 013, 492, 497, 014, 495, 493, 496, 494, 011, 498, 008, 006, 012, 015, 009, 005, 499, 010, 001, 016, 851, 1785, 1710, 1711, 1712, 1713, 1746, 1747, 1748, 1749, 1750, 1771 };
-        ReadOnlySpan<byte>   ball_vals = stackalloc   byte[] { 007, 025, 013, 017, 022, 014, 020, 018, 021, 019, 011, 023, 008, 006, 012, 015, 009, 005, 024, 010, 001, 016, 026, 0027, 0028, 0029, 0030, 0031, 0032, 0033, 0034, 0035, 0036, 0037 };
-        return Util.GetVariedCBListBall(itemList, ball_nums, ball_vals);
-    }
+    private static IReadOnlyList<ComboItem> GetBalls(ReadOnlySpan<string> itemList) => Util.GetVariedCBListBall(itemList, BallStoredIndexes, BallItemIDs);
+
+    // Since Poké Ball (and Great Ball / Ultra Ball) are most common, any list should have them at the top. The rest can be sorted alphabetically.
+    private static ReadOnlySpan<byte> BallStoredIndexes => new byte[]   { 004, 003, 002, 001, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015, 016, 017, 018, 019, 020, 021, 022, 023, 024, 025, 026, 0027, 0028, 0029, 0030, 0031, 0032, 0033, 0034, 0035, 0036, 0037 };
+    private static ReadOnlySpan<ushort> BallItemIDs     => new ushort[] { 004, 003, 002, 001, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015, 016, 492, 493, 494, 495, 496, 497, 498, 499, 576, 851, 1785, 1710, 1711, 1712, 1713, 1746, 1747, 1748, 1749, 1750, 1771 };
 
     private static ComboItem[] GetVersionList(GameStrings s)
     {
@@ -117,7 +125,7 @@ public sealed class GameDataSource
         return Util.GetUnsortedCBList(list, OrderedVersionArray);
     }
 
-    public List<ComboItem> GetItemDataSource(GameVersion game, EntityContext context, IReadOnlyList<ushort> allowed, bool HaX = false)
+    public List<ComboItem> GetItemDataSource(GameVersion game, EntityContext context, ReadOnlySpan<ushort> allowed, bool HaX = false)
     {
         var items = Strings.GetItemStrings(context, game);
         return HaX ? Util.GetCBList(items) : Util.GetCBList(items, allowed);

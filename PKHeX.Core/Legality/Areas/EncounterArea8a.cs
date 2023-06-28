@@ -6,21 +6,19 @@ namespace PKHeX.Core;
 
 /// <inheritdoc cref="EncounterArea" />
 /// <summary>
-/// <see cref="GameVersion.SWSH"/> encounter area
+/// <see cref="GameVersion.PLA"/> encounter area
 /// </summary>
 public sealed record EncounterArea8a : EncounterArea
 {
     public readonly EncounterSlot8a[] Slots;
     private readonly byte[] Locations;
 
-    protected override IReadOnlyList<EncounterSlot8a> Raw => Slots;
-
     public override bool IsMatchLocation(int location)
     {
         return Array.IndexOf(Locations, (byte)location) != -1;
     }
 
-    public override IEnumerable<EncounterSlot8a> GetMatchingSlots(PKM pk, EvoCriteria[] chain) => GetMatches(chain, pk.Met_Level);
+    public IEnumerable<EncounterSlot8a> GetMatchingSlots(PKM pk, EvoCriteria[] chain) => GetMatches(chain, pk.Met_Level);
 
     private IEnumerable<EncounterSlot8a> GetMatches(EvoCriteria[] chain, int metLevel)
     {

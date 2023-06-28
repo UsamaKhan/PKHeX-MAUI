@@ -48,7 +48,7 @@ public partial class SAV_Wondercard : Form
                     return;
 
                 var enc = mga.Gifts[index];
-                pb.AccessibleDescription = string.Join(Environment.NewLine, SummaryPreviewer.GetTextLines(enc));
+                pb.AccessibleDescription = string.Join(Environment.NewLine, enc.GetTextLines());
             };
         }
 
@@ -226,7 +226,7 @@ public partial class SAV_Wondercard : Form
             WinFormsUtil.Alert(MsgMysteryGiftSlotFail, $"{gift.Type} != {other.Type}");
             return;
         }
-        else if (gift is PCD { IsLockCapsule: true } != (index == 11))
+        else if (gift is PCD g && (g is { IsLockCapsule: true } != (index == 11)))
         {
             WinFormsUtil.Alert(MsgMysteryGiftSlotFail, $"{GameInfo.Strings.Item[533]} slot not valid.");
             return;
@@ -251,17 +251,17 @@ public partial class SAV_Wondercard : Form
         int i = index;
         while (i < mga.Gifts.Length - 1)
         {
-            if (mga.Gifts[i+1].Empty)
+            if (mga.Gifts[i + 1].Empty)
                 break;
-            if (mga.Gifts[i+1].Type != mga.Gifts[i].Type)
+            if (mga.Gifts[i + 1].Type != mga.Gifts[i].Type)
                 break;
 
             i++;
 
             var mg1 = mga.Gifts[i];
-            var mg2 = mga.Gifts[i-1];
+            var mg2 = mga.Gifts[i - 1];
 
-            mga.Gifts[i-1] = mg1;
+            mga.Gifts[i - 1] = mg1;
             mga.Gifts[i] = mg2;
         }
         SetBackground(i, Drawing.PokeSprite.Properties.Resources.slotDel);
@@ -486,7 +486,7 @@ public partial class SAV_Wondercard : Form
 
         if (wc_slot == -1) // dropped
         {
-            if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] {Length: not 0} files)
+            if (e?.Data?.GetData(DataFormats.FileDrop) is not string[] { Length: not 0 } files)
                 return;
 
             var first = files[0];

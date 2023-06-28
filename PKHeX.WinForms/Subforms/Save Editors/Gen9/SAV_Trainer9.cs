@@ -1,7 +1,11 @@
 using System;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using PKHeX.Core;
+using PKHeX.Drawing;
 using static PKHeX.Core.SaveBlockAccessor9SV;
 
 namespace PKHeX.WinForms;
@@ -34,11 +38,31 @@ public partial class SAV_Trainer9 : Form
         CB_Gender.Items.Clear();
         CB_Gender.Items.AddRange(Main.GenderSymbols.Take(2).ToArray()); // m/f depending on unicode selection
 
+        GetImages();
         GetComboBoxes();
         GetTextBoxes();
         LoadMap();
 
+        CB_Fashion.SelectedIndex = 0;
+
         Loading = false;
+    }
+
+    private void GetImages()
+    {
+        static Image GetImage(SCBlockAccessor blocks, uint kd, uint kw, uint kh)
+        {
+            var data = blocks.GetBlock(kd).Data;
+            var width = blocks.GetBlockValue<uint>(kw);
+            var height = blocks.GetBlockValue<uint>(kh);
+            var result = DXT1.Decompress(data, (int)width, (int)height);
+            return ImageUtil.GetBitmap(result, (int)width, (int)height, PixelFormat.Format32bppArgb);
+        }
+
+        var blocks = SAV.Blocks;
+        P_CurrPhoto.Image = GetImage(blocks, KPictureProfileCurrent, KPictureProfileCurrentWidth, KPictureProfileCurrentHeight);
+        P_CurrIcon.Image = GetImage(blocks, KPictureIconCurrent, KPictureIconCurrentWidth, KPictureIconCurrentHeight);
+        P_InitialIcon.Image = GetImage(blocks, KPictureIconInitial, KPictureIconInitialWidth, KPictureIconInitialHeight);
     }
 
     private readonly bool Loading;
@@ -79,6 +103,8 @@ public partial class SAV_Trainer9 : Form
         MT_Hours.Text = SAV.PlayedHours.ToString();
         MT_Minutes.Text = SAV.PlayedMinutes.ToString();
         MT_Seconds.Text = SAV.PlayedSeconds.ToString();
+
+        CAL_AdventureStartDate.Value = SAV.EnrollmentDate.Timestamp;
     }
 
     private void Save()
@@ -106,9 +132,11 @@ public partial class SAV_Trainer9 : Form
 
         // Save PlayTime
         SAV.PlayedHours = ushort.Parse(MT_Hours.Text);
-        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text)%60;
-        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text)%60;
-     }
+        SAV.PlayedMinutes = ushort.Parse(MT_Minutes.Text) % 60;
+        SAV.PlayedSeconds = ushort.Parse(MT_Seconds.Text) % 60;
+
+        SAV.EnrollmentDate.Timestamp = CAL_AdventureStartDate.Value;
+    }
 
     private void ClickOT(object sender, MouseEventArgs e)
     {
@@ -155,34 +183,35 @@ public partial class SAV_Trainer9 : Form
         {
             #region Fly Flags
             FSYS_YMAP_FLY_01,
-            FSYS_YMAP_FLY_03,
-            FSYS_YMAP_FLY_12,
             FSYS_YMAP_FLY_02,
-            FSYS_YMAP_FLY_22,
+            FSYS_YMAP_FLY_03,
             FSYS_YMAP_FLY_04,
             FSYS_YMAP_FLY_05,
-            FSYS_YMAP_FLY_23,
-            FSYS_YMAP_FLY_24,
-            FSYS_YMAP_FLY_14,
-            FSYS_YMAP_FLY_15,
+            FSYS_YMAP_FLY_06,
             FSYS_YMAP_FLY_07,
             FSYS_YMAP_FLY_08,
             FSYS_YMAP_FLY_09,
-            FSYS_YMAP_FLY_25,
             FSYS_YMAP_FLY_10,
             FSYS_YMAP_FLY_11,
-            FSYS_YMAP_FLY_26,
-            FSYS_YMAP_FLY_18,
+            FSYS_YMAP_FLY_12,
+            FSYS_YMAP_FLY_13,
+            FSYS_YMAP_FLY_14,
+            FSYS_YMAP_FLY_15,
             FSYS_YMAP_FLY_16,
             FSYS_YMAP_FLY_17,
+            FSYS_YMAP_FLY_18,
             FSYS_YMAP_FLY_19,
-            FSYS_YMAP_FLY_27,
-            FSYS_YMAP_FLY_28,
-            FSYS_YMAP_FLY_13,
-            FSYS_YMAP_FLY_29,
-            FSYS_YMAP_FLY_30,
             FSYS_YMAP_FLY_20,
             FSYS_YMAP_FLY_21,
+            FSYS_YMAP_FLY_22,
+            FSYS_YMAP_FLY_23,
+            FSYS_YMAP_FLY_24,
+            FSYS_YMAP_FLY_25,
+            FSYS_YMAP_FLY_26,
+            FSYS_YMAP_FLY_27,
+            FSYS_YMAP_FLY_28,
+            FSYS_YMAP_FLY_29,
+            FSYS_YMAP_FLY_30,
             FSYS_YMAP_FLY_31,
             FSYS_YMAP_FLY_32,
             FSYS_YMAP_FLY_33,
@@ -192,10 +221,6 @@ public partial class SAV_Trainer9 : Form
             FSYS_YMAP_FLY_MOKKAN,
             FSYS_YMAP_FLY_TSURUGI,
             FSYS_YMAP_FLY_UTSUWA,
-            FSYS_YMAP_MAGATAMA,
-            FSYS_YMAP_MOKKAN,
-            FSYS_YMAP_TSURUGI,
-            FSYS_YMAP_UTSUWA,
             FSYS_YMAP_POKECEN_02,
             FSYS_YMAP_POKECEN_03,
             FSYS_YMAP_POKECEN_04,
@@ -230,6 +255,12 @@ public partial class SAV_Trainer9 : Form
             FSYS_YMAP_POKECEN_33,
             FSYS_YMAP_POKECEN_34,
             FSYS_YMAP_POKECEN_35,
+
+            // Treasures of Ruin shrine toggles
+            FSYS_YMAP_MAGATAMA,
+            FSYS_YMAP_MOKKAN,
+            FSYS_YMAP_TSURUGI,
+            FSYS_YMAP_UTSUWA,
             #endregion
         };
         var accessor = SAV.Accessor;
@@ -264,6 +295,46 @@ public partial class SAV_Trainer9 : Form
         var accessor = SAV.Accessor;
         foreach (var block in blocks)
             accessor.GetBlock(block).ChangeBooleanType(SCTypeCode.Bool2);
+        System.Media.SystemSounds.Asterisk.Play();
+    }
+
+    private static void IMG_Save(Image image, string name)
+    {
+        var sfd = new SaveFileDialog
+        {
+            FileName = name,
+            Filter = "Images|*.png;*.bmp;*.jpg",
+        };
+        if (sfd.ShowDialog() != DialogResult.OK)
+            return;
+
+        var path = sfd.FileName;
+        var format = Path.GetExtension(path) switch
+        {
+            ".jpg" or ".jpeg" => ImageFormat.Jpeg,
+            ".bmp" => ImageFormat.Bmp,
+            _ => ImageFormat.Png,
+        };
+        image.Save(path, format);
+        System.Media.SystemSounds.Asterisk.Play();
+    }
+
+    private void P_CurrPhoto_Click(object sender, EventArgs e) => IMG_Save(P_CurrPhoto.Image, "current_photo");
+    private void P_CurrIcon_Click(object sender, EventArgs e) => IMG_Save(P_CurrIcon.Image, "current_icon");
+    private void P_InitialIcon_Click(object sender, EventArgs e) => IMG_Save(P_InitialIcon.Image, "initial_icon");
+
+    private void B_UnlockClothing_Click(object sender, EventArgs e)
+    {
+        var accessor = SAV.Accessor;
+        var added = CB_Fashion.SelectedIndex switch
+        {
+            0 => PlayerFashionUnlock9.UnlockBase(accessor, SAV.Gender),
+            1 => PlayerFashionUnlock9.UnlockExtras(accessor),
+            2 => PlayerFashionUnlock9.UnlockPreorder(accessor, SAV.Gender),
+            3 => PlayerFashionUnlock9.UnlockPortal(accessor),
+            _ => throw new Exception("Invalid fashion type."),
+        };
+        WinFormsUtil.Alert(string.Format(MessageStrings.MsgClothingAdded, added));
         System.Media.SystemSounds.Asterisk.Play();
     }
 }

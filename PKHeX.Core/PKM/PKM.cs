@@ -21,7 +21,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public abstract int SIZE_STORED { get; }
     public string Extension => GetType().Name.ToLowerInvariant();
     public abstract PersonalInfo PersonalInfo { get; }
-    public virtual IReadOnlyList<ushort> ExtraBytes => Array.Empty<ushort>();
+    public virtual ReadOnlySpan<ushort> ExtraBytes => Array.Empty<ushort>();
 
     // Internal Attributes set on creation
     public readonly byte[] Data; // Raw Storage
@@ -282,7 +282,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public bool SWSH => Version is (int)SW or (int)SH;
     public virtual bool BDSP => Version is (int)BD or (int)SP;
     public virtual bool LA => Version is (int)PLA;
-    public bool SV => Version is (int)SL or (int)VL;
+    public virtual bool SV => Version is (int)SL or (int)VL;
 
     public bool GO_LGPE => GO && Met_Location == Locations.GO7;
     public bool GO_HOME => GO && Met_Location == Locations.GO8;
@@ -318,7 +318,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         }
     }
 
-    public bool PKRS_Infected { get => PKRS_Strain != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
+    public bool PKRS_Infected { get => PKRS_Days != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
 
     public bool PKRS_Cured
     {
@@ -479,12 +479,12 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         RelearnMove4 = value.Move4;
     }
 
-    public void SetRelearnMoves(IReadOnlyList<ushort> value)
+    public void SetRelearnMoves(ReadOnlySpan<ushort> value)
     {
-        RelearnMove1 = value.Count > 0 ? value[0] : default;
-        RelearnMove2 = value.Count > 1 ? value[1] : default;
-        RelearnMove3 = value.Count > 2 ? value[2] : default;
-        RelearnMove4 = value.Count > 3 ? value[3] : default;
+        RelearnMove1 = value.Length > 0 ? value[0] : default;
+        RelearnMove2 = value.Length > 1 ? value[1] : default;
+        RelearnMove3 = value.Length > 2 ? value[2] : default;
+        RelearnMove4 = value.Length > 3 ? value[3] : default;
     }
 
     public int PIDAbility
@@ -592,26 +592,39 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     /// </summary>
     private void ReorderMoves()
     {
-        if (Move1 == 0 && Move2 != 0)
+        // Loop to catch multiple empty slots. X2X4 needs 3 shifts, XX34 needs 4.
+        while (true)
         {
-            Move1 = Move2;
-            Move1_PP = Move2_PP;
-            Move1_PPUps = Move2_PPUps;
-            Move2 = 0;
-        }
-        if (Move2 == 0 && Move3 != 0)
-        {
-            Move2 = Move3;
-            Move2_PP = Move3_PP;
-            Move2_PPUps = Move3_PPUps;
-            Move3 = 0;
-        }
-        if (Move3 == 0 && Move4 != 0)
-        {
-            Move3 = Move4;
-            Move3_PP = Move4_PP;
-            Move3_PPUps = Move4_PPUps;
-            Move4 = 0;
+            if (Move1 == 0 && Move2 != 0)
+            {
+                // This branch can only be true once, as Move1 is the top move.
+                Move1 = Move2;
+                Move1_PP = Move2_PP;
+                Move1_PPUps = Move2_PPUps;
+                Move2 = 0;
+            }
+            else if (Move2 == 0 && Move3 != 0)
+            {
+                // This branch can be true more than once, if shifting 3 & 4 down into 1 & 2.
+                Move2 = Move3;
+                Move2_PP = Move3_PP;
+                Move2_PPUps = Move3_PPUps;
+                Move3 = 0;
+            }
+            else if (Move3 == 0 && Move4 != 0)
+            {
+                // This branch can be true only once, as Move4 is the lowest move and nothing can refill it.
+                Move3 = Move4;
+                Move3_PP = Move4_PP;
+                Move3_PPUps = Move4_PPUps;
+                Move4 = 0;
+                // Still need to loop as Move 3 may still have empty slots before it.
+            }
+            else
+            {
+                // No more reordering, current moveset has no empty slots exist before nonzero slots.
+                return;
+            }
         }
     }
 
@@ -630,7 +643,10 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     /// <summary>
     /// Gets the IV Judge Rating value.
     /// </summary>
-    /// <remarks>IV Judge scales his response 0 (worst) to 3 (best).</remarks>
+    /// <remarks>
+    /// IV Judge scales his response 0 (worst) to 3 (best).<br/>
+    /// Assumes IVs are in the 0-31 range, so this isn't really useful for Gen1/2 formats that are 0-15 per IV.
+    /// </remarks>
     public int PotentialRating => IVTotal switch
     {
         <=  90 => 0,
@@ -659,7 +675,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         else
             LoadStats(stats, p, level);
 
-        // Account for nature
+        // Amplify stats based on the stat nature.
         NatureAmp.ModifyStatsForNature(stats, StatNature);
     }
 
@@ -757,7 +773,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     /// </summary>
     /// <param name="valid">Items that the <see cref="PKM"/> can hold.</param>
     /// <returns>True/False if the <see cref="PKM"/> can hold its <see cref="HeldItem"/>.</returns>
-    public virtual bool CanHoldItem(IReadOnlyList<ushort> valid) => valid.Contains((ushort)HeldItem);
+    public virtual bool CanHoldItem(ReadOnlySpan<ushort> valid) => valid.Contains((ushort)HeldItem);
 
     /// <summary>
     /// Deep clones the <see cref="PKM"/> object. The clone will not have any shared resources with the source.
@@ -904,7 +920,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         {
             for (int i = 0; i < count; i++)
                 ivs[i] = MaxIV;
-            Util.Shuffle(ivs, 0, ivs.Length, rnd); // Randomize IV order
+            rnd.Shuffle(ivs); // Randomize IV order
         }
         SetIVs(ivs);
     }
@@ -952,13 +968,13 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         if (gen >= 6)
         {
             var species = Species;
-            if (Legal.Mythicals.Contains(species))
+            if (SpeciesCategory.IsMythical(species))
                 return 3;
-            if (Legal.Legends.Contains(species))
+            if (SpeciesCategory.IsLegendary(species))
                 return 3;
-            if (Legal.SubLegends.Contains(species))
+            if (SpeciesCategory.IsSubLegendary(species))
                 return 3;
-            if (gen <= 7 && Legal.IsUltraBeast(species))
+            if (gen <= 7 && SpeciesCategory.IsUltraBeast(species))
                 return 3;
         }
         if (XY)

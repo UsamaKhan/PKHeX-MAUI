@@ -12,9 +12,9 @@ public sealed class LearnSource9SV : ILearnSource<PersonalInfo9SV>, IEggSource, 
 {
     public static readonly LearnSource9SV Instance = new();
     private static readonly PersonalTable9SV Personal = PersonalTable.SV;
-    private static readonly Learnset[] Learnsets = Legal.LevelUpSV;
-    private static readonly ushort[][] EggMoves = Legal.EggMovesSV;
-    private static readonly ushort[][] Reminder = Legal.ReminderSV;
+    private static readonly Learnset[] Learnsets = LearnsetReader.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("lvlmove_sv.pkl"), "sv"));
+    private static readonly ushort[][] EggMoves = EggMoves9.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("eggmove_sv.pkl"), "sv"));
+    private static readonly ushort[][] Reminder = EggMoves9.GetArray(BinLinkerAccessor.Get(Util.GetBinaryResource("reminder_sv.pkl"), "sv"));
     private const int MaxSpecies = Legal.MaxSpeciesID_9;
     private const LearnEnvironment Game = SV;
 
@@ -133,13 +133,9 @@ public sealed class LearnSource9SV : ILearnSource<PersonalInfo9SV>, IEggSource, 
         if (types.HasFlag(MoveSourceType.LevelUp))
         {
             var learn = GetLearnset(evo.Species, evo.Form);
-            (bool hasMoves, int start, int end) = learn.GetMoveRange(evo.LevelMax);
-            if (hasMoves)
-            {
-                var moves = learn.Moves;
-                for (int i = end; i >= start; i--)
-                    result[moves[i]] = true;
-            }
+            var span = learn.GetMoveRange(evo.LevelMax);
+            foreach (var move in span)
+                result[move] = true;
         }
 
         if (types.HasFlag(MoveSourceType.SharedEggMove))

@@ -404,10 +404,10 @@ public partial class SAV_Database : Form
 
         if (Main.Settings.EntityDb.FilterUnavailableSpecies)
         {
-            static bool IsPresentInGameSV  (ISpeciesForm pk) => pk is PK9 || PersonalTable.SV  .IsPresentInGame(pk.Species, pk.Form);
+            static bool IsPresentInGameSV(ISpeciesForm pk) => pk is PK9 || PersonalTable.SV.IsPresentInGame(pk.Species, pk.Form);
             static bool IsPresentInGameSWSH(ISpeciesForm pk) => pk is PK8 || PersonalTable.SWSH.IsPresentInGame(pk.Species, pk.Form);
             static bool IsPresentInGameBDSP(ISpeciesForm pk) => pk is PB8 || PersonalTable.BDSP.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGamePLA (ISpeciesForm pk) => pk is PA8 || PersonalTable.LA  .IsPresentInGame(pk.Species, pk.Form);
+            static bool IsPresentInGamePLA(ISpeciesForm pk) => pk is PA8 || PersonalTable.LA.IsPresentInGame(pk.Species, pk.Form);
             if (sav is SAV9SV)
                 result.RemoveAll(z => !IsPresentInGameSV(z.Entity));
             else if (sav is SAV8SWSH)
@@ -433,11 +433,38 @@ public partial class SAV_Database : Form
         var sav = SaveUtil.GetVariantSAV(file);
         if (sav == null)
         {
-            Debug.WriteLine("Unable to load SaveFile: " + file);
+            if (FileUtil.TryGetMemoryCard(file, out var mc))
+                TryAddPKMsFromMemoryCard(dbTemp, mc, file);
+            else
+                Debug.WriteLine($"Unable to load SaveFile: {file}");
             return;
         }
 
         SlotInfoLoader.AddFromSaveFile(sav, dbTemp);
+    }
+
+    private static void TryAddPKMsFromMemoryCard(ConcurrentBag<SlotCache> dbTemp, SAV3GCMemoryCard mc, string file)
+    {
+        var state = mc.GetMemoryCardState();
+        if (state == GCMemoryCardState.Invalid)
+            return;
+
+        if (mc.HasCOLO)
+            TryAdd(dbTemp, mc, file, GameVersion.COLO);
+        if (mc.HasXD)
+            TryAdd(dbTemp, mc, file, GameVersion.XD);
+        if (mc.HasRSBOX)
+            TryAdd(dbTemp, mc, file, GameVersion.RSBOX);
+
+        static void TryAdd(ConcurrentBag<SlotCache> dbTemp, SAV3GCMemoryCard mc, string path, GameVersion game)
+        {
+            mc.SelectSaveGame(game);
+            var sav = SaveUtil.GetVariantSAV(mc);
+            if (sav is null)
+                return;
+            sav.Metadata.SetExtraInfo(path);
+            SlotInfoLoader.AddFromSaveFile(sav, dbTemp);
+        }
     }
 
     // IO Usage
@@ -619,7 +646,7 @@ public partial class SAV_Database : Form
             }
             return;
         }
-        int begin = start*RES_MIN;
+        int begin = start * RES_MIN;
         int end = Math.Min(RES_MAX, Results.Count - begin);
         for (int i = 0; i < end; i++)
             PKXBOXES[i].Image = Results[i + begin].Entity.Sprite(SAV, -1, -1, true);

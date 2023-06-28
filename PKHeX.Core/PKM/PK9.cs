@@ -1,16 +1,15 @@
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 9 <see cref="PKM"/> format. </summary>
-public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechRecord, IObedienceLevel,
+public sealed class PK9 : PKM, ISanityChecksum, ITeraType, ITechRecord, IObedienceLevel,
     IContestStats, IHyperTrain, IScaledSize, IScaledSize3, IFavorite, IHandlerLanguage, IFormArgument, IHomeTrack, IBattleVersion, ITrainerMemories,
     IRibbonIndex, IRibbonSetAffixed, IRibbonSetRibbons, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetCommon7, IRibbonSetCommon8, IRibbonSetCommon9, IRibbonSetMarks, IRibbonSetMark8, IRibbonSetMark9
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x17,
         0x1A, 0x1B,
@@ -26,10 +25,9 @@ public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechReco
         0x115,
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
     public override PersonalInfo9SV PersonalInfo => PersonalTable.SV.GetFormEntry(Species, Form);
     public IPermitRecord Permit => PersonalInfo;
-    public override bool IsNative => SWSH;
+    public override bool IsNative => SV;
     public override EntityContext Context => EntityContext.Gen9;
 
     public PK9() : base(PokeCrypto.SIZE_9PARTY)
@@ -88,22 +86,7 @@ public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechReco
     public bool IsUnhatchedEgg => Version == 0 && IsEgg;
 
     // Complex Generated Attributes
-    public override int Characteristic
-    {
-        get
-        {
-            int pm6 = (int)(EncryptionConstant % 6);
-            int maxIV = MaximumIV;
-            int pm6stat = 0;
-            for (int i = 0; i < 6; i++)
-            {
-                pm6stat = (pm6 + i) % 6;
-                if (GetIV(pm6stat) == maxIV)
-                    break;
-            }
-            return (pm6stat * 5) + (maxIV % 5);
-        }
-    }
+    public override int Characteristic => EntityCharacteristic.GetCharacteristic(EncryptionConstant, IV32);
 
     // Methods
     protected override byte[] Encrypt()
@@ -469,7 +452,7 @@ public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechReco
     private const int RecordStart = 0x12F;
     internal const int COUNT_RECORD = 200; // Up to 200 TM flags, but not all are used.
     private const int RecordLength = COUNT_RECORD / 8;
-    internal Span<byte> RecordFlags => Data.AsSpan(RecordStart, RecordLength);
+    public Span<byte> RecordFlags => Data.AsSpan(RecordStart, RecordLength);
 
     public bool GetMoveRecordFlag(int index)
     {
@@ -487,9 +470,8 @@ public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechReco
         FlagUtil.SetFlag(Data, RecordStart + ofs, index & 7, value);
     }
 
-    public bool GetMoveRecordFlagAny() => Array.FindIndex(Data, RecordStart, RecordLength, static z => z != 0) >= 0;
-
-    public void ClearMoveRecordFlags() => Data.AsSpan(RecordStart, RecordLength).Clear();
+    public bool GetMoveRecordFlagAny() => RecordFlags.IndexOfAnyExcept<byte>(0) >= 0;
+    public void ClearMoveRecordFlags() => RecordFlags.Clear();
 
     #endregion
     #region Battle Stats
@@ -611,24 +593,11 @@ public sealed class PK9 : PKM, ISanityChecksum, ITeraType, IMoveReset, ITechReco
         HT_Language = (byte)tr.Language;
     }
 
-    public void ResetMoves()
-    {
-        var learnsets = Legal.LevelUpSV;
-        var table = PersonalTable.SV;
-
-        var index = table.GetFormIndex(Species, Form);
-        var learn = learnsets[index];
-        Span<ushort> moves = stackalloc ushort[4];
-        learn.SetEncounterMoves(CurrentLevel, moves);
-        SetMoves(moves);
-        this.SetMaximumPPCurrent(moves);
-    }
-
     // Maximums
     public override ushort MaxMoveID => Legal.MaxMoveID_9;
     public override ushort MaxSpeciesID => Legal.MaxSpeciesID_9;
     public override int MaxAbilityID => Legal.MaxAbilityID_9;
     public override int MaxItemID => Legal.MaxItemID_9;
     public override int MaxBallID => Legal.MaxBallID_9;
-    public override int MaxGameID => Legal.MaxGameID_9;
+    public override int MaxGameID => Legal.MaxGameID_HOME;
 }

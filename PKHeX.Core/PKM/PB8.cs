@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 
 namespace PKHeX.Core;
 
 /// <summary> Generation 8 <see cref="PKM"/> format. </summary>
 public sealed class PB8 : G8PKM
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         // Alignment bytes
         0x17, 0x1A, 0x1B, 0x23, 0x33, 0x3E, 0x3F,
@@ -26,7 +25,6 @@ public sealed class PB8 : G8PKM
         0x140, 0x141, 0x142, 0x143, 0x144, 0x145, 0x146, 0x147,
     };
 
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
     public override PersonalInfo8BDSP PersonalInfo => PersonalTable.BDSP.GetFormEntry(Species, Form);
     public override IPermitRecord Permit => PersonalInfo;
     public override bool IsNative => BDSP;
@@ -126,43 +124,9 @@ public sealed class PB8 : G8PKM
     public override int MaxAbilityID => Legal.MaxAbilityID_8b;
     public override int MaxItemID => Legal.MaxItemID_8b;
     public override int MaxBallID => Legal.MaxBallID_8b;
-    public override int MaxGameID => Legal.MaxGameID_8b;
+    public override int MaxGameID => Legal.MaxGameID_HOME;
 
     public override bool WasEgg => IsEgg || Egg_Day != 0;
 
-    public PK8 ConvertToPK8()
-    {
-        var pk = ConvertTo<PK8>();
-        pk.SanitizeImport();
-        return pk;
-    }
-
-    public override PA8 ConvertToPA8()
-    {
-        var pk = base.ConvertToPA8();
-        if (pk.Egg_Location == Locations.Default8bNone)
-            pk.Egg_Location = 0;
-        return pk;
-    }
-
-    public override bool HasOriginalMetLocation => base.HasOriginalMetLocation && !(LA && Met_Location == Locations.HOME_SWLA);
-
-    public override void ResetMoves()
-    {
-        var learnsets = Legal.LevelUpBDSP;
-        var table = PersonalTable.BDSP;
-
-        var index = table.GetFormIndex(Species, Form);
-        var learn = learnsets[index];
-        Span<ushort> moves = stackalloc ushort[4];
-        learn.SetEncounterMoves(CurrentLevel, moves);
-        SetMoves(moves);
-        this.SetMaximumPPCurrent(moves);
-    }
-
-    public PK9 ConvertToPK9()
-    {
-        // Todo: Transfer to PK9
-        return new PK9();
-    }
+    public override bool HasOriginalMetLocation => base.HasOriginalMetLocation && !(LA && Met_Location == LocationsHOME.SWLA);
 }

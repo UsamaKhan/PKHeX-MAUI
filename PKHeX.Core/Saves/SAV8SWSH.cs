@@ -54,7 +54,7 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     protected override byte[] GetFinalData() => SwishCrypto.Encrypt(AllBlocks);
 
     public override PersonalTable8SWSH Personal => PersonalTable.SWSH;
-    public override IReadOnlyList<ushort> HeldItems => Legal.HeldItems_SWSH;
+    public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_SWSH;
 
     #region Blocks
     public SCBlockAccessor Accessor => Blocks;
@@ -74,6 +74,7 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
     public Daycare8 Daycare => Blocks.Daycare;
     public Record8 Records => Blocks.Records;
     public TrainerCard8 TrainerCard => Blocks.TrainerCard;
+    public FashionUnlock8 Fashion => Blocks.Fashion;
     public RaidSpawnList8 Raid => Blocks.Raid;
     public RaidSpawnList8 RaidArmor => Blocks.RaidArmor;
     public RaidSpawnList8 RaidCrown => Blocks.RaidCrown;
@@ -246,10 +247,10 @@ public sealed class SAV8SWSH : SaveFile, ISaveBlock8SWSH, ITrainerStatRecord, IS
         protected set => PartyInfo.PartyCount = value;
     }
 
-    protected override byte[] BoxBuffer => BoxInfo.Data;
-    protected override byte[] PartyBuffer => PartyInfo.Data;
+    protected override Span<byte> BoxBuffer => BoxInfo.Data;
+    protected override Span<byte> PartyBuffer => PartyInfo.Data;
     public override PK8 GetDecryptedPKM(byte[] data) => GetPKM(DecryptPKM(data));
-    public override PK8 GetBoxSlot(int offset) => GetDecryptedPKM(GetData(BoxInfo.Data, offset, SIZE_PARTY)); // party format in boxes!
+    public override PK8 GetBoxSlot(int offset) => GetDecryptedPKM(BoxInfo.Data.AsSpan(offset, SIZE_PARTY).ToArray()); // party format in boxes!
 
     public int GetRecord(int recordID) => Records.GetRecord(recordID);
     public void SetRecord(int recordID, int value) => Records.SetRecord(recordID, value);

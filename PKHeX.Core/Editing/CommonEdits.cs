@@ -174,13 +174,13 @@ public static class CommonEdits
             // Under this scenario, just force the Hidden Power type.
             if (Array.IndexOf(Set.Moves, (ushort)Move.HiddenPower) != -1 && pk.HPType != Set.HiddenPowerType)
             {
-                if (Array.Exists(Set.IVs, static iv => iv >= 30))
+                if (Set.IVs.AsSpan().IndexOfAny(30, 31) >= 0)
                     pk.SetHiddenPower(Set.HiddenPowerType);
             }
 
             // In Generation 1/2 Format sets, when EVs are not specified at all, it implies maximum EVs instead!
             // Under this scenario, just apply maximum EVs (65535).
-            if (Array.TrueForAll(Set.EVs, static ev => ev == 0))
+            if (Set.EVs.AsSpan().IndexOfAnyExcept(0) == -1)
                 gb.MaxEVs();
             else
                 pk.SetEVs(Set.EVs);
@@ -249,7 +249,7 @@ public static class CommonEdits
 
         var legal = new LegalityAnalysis(pk);
         if (legal.Parsed && !MoveResult.AllValid(legal.Info.Relearn))
-            pk.SetRelearnMoves(legal.GetSuggestedRelearnMoves());
+            pk.SetRelearnMoves(legal);
         pk.ResetPartyStats();
         pk.RefreshChecksum();
     }
@@ -415,8 +415,21 @@ public static class CommonEdits
     /// <param name="pk">Pokémon to modify.</param>
     public static void SetDefaultNickname(this PKM pk) => pk.SetDefaultNickname(new LegalityAnalysis(pk));
 
-    private static readonly string[] PotentialUnicode = { "★☆☆☆", "★★☆☆", "★★★☆", "★★★★" };
-    private static readonly string[] PotentialNoUnicode = { "+", "++", "+++", "++++" };
+    private static string GetPotentialUnicode(int rating) => rating switch
+    {
+        0 => "★☆☆☆",
+        1 => "★★☆☆",
+        2 => "★★★☆",
+        _ => "★★★★",
+    };
+
+    private static string GetPotentialASCII(int rating) => rating switch
+    {
+        0 => "+",
+        1 => "++",
+        2 => "+++",
+        _ => "++++",
+    };
 
     /// <summary>
     /// Gets the Potential evaluation of the input <see cref="pk"/>.
@@ -426,8 +439,10 @@ public static class CommonEdits
     /// <returns>Potential string</returns>
     public static string GetPotentialString(this PKM pk, bool unicode = true)
     {
-        var arr = unicode ? PotentialUnicode : PotentialNoUnicode;
-        return arr[pk.PotentialRating];
+        var rating = pk.PotentialRating;
+        if (unicode)
+            return GetPotentialUnicode(rating);
+        return GetPotentialASCII(rating);
     }
 
     // Extensions

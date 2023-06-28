@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 using static System.Buffers.Binary.BinaryPrimitives;
 
@@ -10,7 +9,7 @@ public sealed class PK5 : PKM, ISanityChecksum,
     IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetUnique3, IRibbonSetUnique4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetRibbons,
     IContestStats, IGroundTile
 {
-    private static readonly ushort[] Unused =
+    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
     {
         0x43, 0x44, 0x45, 0x46, 0x47,
         0x5E, // unused
@@ -19,8 +18,6 @@ public sealed class PK5 : PKM, ISanityChecksum,
         0x86, // unused
         0x87, // PokeStar Fame
     };
-
-    public override IReadOnlyList<ushort> ExtraBytes => Unused;
 
     public override int SIZE_PARTY => PokeCrypto.SIZE_5PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_5STORED;
@@ -278,23 +275,7 @@ public sealed class PK5 : PKM, ISanityChecksum,
     // Generated Attributes
     public override uint PSV => ((PID >> 16) ^ (PID & 0xFFFF)) >> 3;
     public override uint TSV => (uint)(TID16 ^ SID16) >> 3;
-
-    public override int Characteristic
-    {
-        get
-        {
-            int pm6 = (int)(PID % 6); // PID
-            int maxIV = MaximumIV;
-            int pm6stat = 0;
-            for (int i = 0; i < 6; i++)
-            {
-                pm6stat = (pm6 + i) % 6;
-                if (GetIV(pm6stat) == maxIV)
-                    break;
-            }
-            return (pm6stat * 5) + (maxIV % 5);
-        }
-    }
+    public override int Characteristic => EntityCharacteristic.GetCharacteristic(PID, IV32);
 
     // Maximums
     public override ushort MaxMoveID => Legal.MaxMoveID_5;
@@ -557,5 +538,23 @@ public sealed class PK5 : PKM, ISanityChecksum,
         if (Gen5)
             pid >>= 16;
         return (int)(pid & 1);
+    }
+
+    internal static int GetTransferMetLocation4(PKM pk)
+    {
+        // Everything except for crown beasts and Celebi get the default transfer location.
+        // Crown beasts and Celebi are 100% identifiable by the species ID and fateful encounter, originating from Gen4.
+        if (!pk.Gen4 || !pk.FatefulEncounter)
+            return Locations.Transfer4; // Pokétransfer
+
+        return pk.Species switch
+        {
+            // Crown Beast
+            (int)Core.Species.Raikou or (int)Core.Species.Entei or (int)Core.Species.Suicune => Locations.Transfer4_CrownUnused,
+            // Celebi
+            (int)Core.Species.Celebi => Locations.Transfer4_CelebiUnused,
+            // Default
+            _ => Locations.Transfer4,
+        };
     }
 }

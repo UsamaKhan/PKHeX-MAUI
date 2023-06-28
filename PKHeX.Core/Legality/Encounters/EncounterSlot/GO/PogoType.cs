@@ -21,6 +21,9 @@ public enum PogoType : byte
     RaidM,
     /// <summary> Ultra Beasts captured after completing Raid Battles. Only Beast Balls can be used. </summary>
     RaidUB,
+    /// <summary> Shadow Pokémon captured after completing Shadow Raid Battles. Must be Purified before transferring to Pokémon HOME. </summary>
+    /// <remarks> Pokémon with this <see cref="PogoType"/> can not be moved to <see cref="GameVersion.GG"/>. </remarks>
+    RaidS,
 
     /// <summary> Pokémon captured after completing Field Research. </summary>
     Research = 20,
@@ -30,6 +33,9 @@ public enum PogoType : byte
     ResearchP,
     /// <summary> Ultra Beasts captured after completing Field Research. Only Beast Balls can be used. </summary>
     ResearchUB,
+    /// <summary> Mythical Pokémon captured after completing Field Research. No HUD is visible during these encounters. </summary>
+    /// <remarks> Under normal circumstances, only Poké Balls can be used, but Great Balls and Ultra Balls can be used with the Remember Last-Used Poké Ball setting. </remarks>
+    ResearchNH,
 
     /// <summary> Pokémon captured from the GO Battle League. </summary>
     GBL = 30,
@@ -38,11 +44,26 @@ public enum PogoType : byte
     /// <summary> Pokémon captured from the GO Battle League during GO Battle Day, excluding Legendary and Mythical Pokémon. </summary>
     GBLD,
 
-    /// <summary> Pokémon captured after defeating members of Team GO Rocket. Must become Purified before transferring to Pokémon HOME. </summary>
+    /// <summary> Pokémon captured after defeating members of Team GO Rocket. Must be Purified before transferring to Pokémon HOME. </summary>
     /// <remarks> Pokémon with this <see cref="PogoType"/> can not be moved to <see cref="GameVersion.GG"/>. </remarks>
     Shadow = 40,
+
+    /// <summary>
+    /// Pokémon captured from Special Research or Timed Research with a Premier Ball.
+    /// </summary>
+    /// <remarks>
+    /// Niantic pushed release 0.269 on April 22, 2023, which contained an issue with the Remember Last-Used Poké Ball setting.
+    /// This allowed for Premier Balls obtained from Raid Battles to be remembered on all future encounters.
+    /// The moment the Premier Ball touched the floor or a wild Pokémon, the encounter would end, except if it was from a Special Research and Timed Research encounter.
+    /// This made it possible for over 300 species of Pokémon to be obtainable in a Poké Ball they were never meant to be captured in.
+    /// </remarks>
+    Research269 = 200,
+    Research269M,
 }
 
+/// <summary>
+/// Extension methods for <see cref="PogoType"/>.
+/// </summary>
 public static class PogoTypeExtensions
 {
     /// <summary>
@@ -55,15 +76,19 @@ public static class PogoTypeExtensions
         PogoType.Raid => 20,
         PogoType.RaidM => 20,
         PogoType.RaidUB => 20,
+        PogoType.RaidS => 20,
         PogoType.Research => 15,
         PogoType.ResearchM => 15,
         PogoType.ResearchP => 15,
         PogoType.ResearchUB => 15,
+        PogoType.ResearchNH => 15,
         PogoType.GBL => 20,
         PogoType.GBLM => 20,
         PogoType.GBLD => 20,
         PogoType.Shadow => 8,
-        _ => 1,
+        PogoType.Research269 => 15,
+        PogoType.Research269M => 15,
+        _ => 1, // Wild, Egg
     };
 
     /// <summary>
@@ -77,8 +102,10 @@ public static class PogoTypeExtensions
         PogoType.RaidM => 10,
         PogoType.ResearchM => 10,
         PogoType.ResearchP => 10,
+        PogoType.ResearchNH => 10,
         PogoType.GBLM => 10,
         PogoType.GBLD => 0,
+        PogoType.Research269M => 10,
         _ => 1,
     };
 
@@ -108,9 +135,12 @@ public static class PogoTypeExtensions
         PogoType.Raid => Ball.Premier,
         PogoType.RaidM => Ball.Premier,
         PogoType.RaidUB => Ball.Beast,
+        PogoType.RaidS => Ball.Premier,
         PogoType.ResearchP => Ball.Poke,
         PogoType.ResearchUB => Ball.Beast,
         PogoType.Shadow => Ball.Premier,
+        PogoType.Research269 => Ball.Premier,
+        PogoType.Research269M => Ball.Premier,
         _ => Ball.None, // Poke, Great, Ultra
     };
 }
