@@ -488,7 +488,7 @@ public sealed class WB8 : DataMysteryGift, ILangNick, INature, IRibbonIndex, ICo
             pk.SID16 = tr.SID16;
         }
 
-        pk.MetDate = IsDateRestricted && EncounterServerDate.WB8Gifts.TryGetValue(CardID, out var dt) ? dt.Start : DateOnly.FromDateTime(DateTime.Now);
+        pk.MetDate = IsDateRestricted && EncounterServerDate.WB8Gifts.TryGetValue(CardID, out var dt) ? dt.Start : EncounterDate.GetDateSwitch();
         // HOME Gifts for Sinnoh/Hisui starters were forced JPN until May 20, 2022 (UTC).
         if (CardID is 9015 or 9016 or 9017)
             pk.Met_Day = 20;
@@ -519,19 +519,18 @@ public sealed class WB8 : DataMysteryGift, ILangNick, INature, IRibbonIndex, ICo
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PB8 pk)
     {
         pk.IsEgg = true;
-        pk.EggMetDate = DateOnly.FromDateTime(DateTime.Now);
+        pk.EggMetDate = EncounterDate.GetDateSwitch();
         pk.Nickname = SpeciesName.GetEggName(pk.Language, Generation);
         pk.IsNicknamed = false;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PB8 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.BDSP.GetFormEntry(Species, Form);
-        pk.Nature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
-        pk.StatNature = pk.Nature;
+        var pi = pk.PersonalInfo;
+        pk.Nature = pk.StatNature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
         pk.RefreshAbility(av);
@@ -588,12 +587,12 @@ public sealed class WB8 : DataMysteryGift, ILangNick, INature, IRibbonIndex, ICo
         return pid;
     }
 
-    private void SetPID(PKM pk)
+    private void SetPID(PB8 pk)
     {
         pk.PID = GetPID(pk, PIDType);
     }
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PB8 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -676,16 +675,7 @@ public sealed class WB8 : DataMysteryGift, ILangNick, INature, IRibbonIndex, ICo
         {
             if (!Shiny.IsValid(pk)) return false;
             if (!IsMatchEggLocation(pk)) return false;
-            if (pk is PK8)
-            {
-                if (!LocationsHOME.IsValidMetBDSP((ushort)pk.Met_Location, pk.Version))
-                    return false;
-            }
-            else
-            {
-                if (MetLocation != pk.Met_Location)
-                    return false;
-            }
+            if (!IsMatchLocation(pk)) return false;
         }
 
         if (MetLevel != 0 && MetLevel != pk.Met_Level) return false;
@@ -709,7 +699,28 @@ public sealed class WB8 : DataMysteryGift, ILangNick, INature, IRibbonIndex, ICo
         return pk.Egg_Location == expect;
     }
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    private bool IsMatchLocation(PKM pk)
+    {
+        var metState = LocationsHOME.GetRemapState(Context, pk.Context);
+        if (metState == LocationRemapState.Original)
+            return IsMatchLocationExact(pk);
+        if (metState == LocationRemapState.Remapped)
+            return IsMatchLocationRemapped(pk);
+        return IsMatchLocationExact(pk) || IsMatchLocationRemapped(pk);
+    }
+
+    private bool IsMatchLocationExact(PKM pk) => pk.Met_Location == Location;
+
+    private bool IsMatchLocationRemapped(PKM pk)
+    {
+        var met = (ushort)pk.Met_Location;
+        var version = pk.Version;
+        if (pk.Context == EntityContext.Gen8)
+            return LocationsHOME.IsValidMetBDSP(met, version);
+        return LocationsHOME.GetMetSWSH((ushort)Location, version) == met;
+    }
+
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => false; // no version compatibility checks yet.
 
     #region Lazy Ribbon Implementation

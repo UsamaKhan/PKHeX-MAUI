@@ -9,6 +9,16 @@ public static class Tera9RNG
 {
     private const uint TeraTypeCount = 18;
 
+    /// <summary>
+    /// Checks if the <see cref="ITeraType.TeraTypeOriginal"/> matches the specification of the <see cref="gem"/> value.
+    /// </summary>
+    /// <param name="seed">Seed used to generate the Tera Type</param>
+    /// <param name="gem">Encounter specified Gem Type</param>
+    /// <param name="species">Encounter Species</param>
+    /// <param name="form">Encounter Form</param>
+    /// <param name="original">Original Tera Type from the Entity</param>
+    /// <returns>True if the Tera Type matches the RNG and specification</returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public static bool IsMatchTeraType(in uint seed, in GemType gem, in ushort species, in byte form, in byte original)
     {
         if (gem.IsSpecified(out var type))
@@ -43,6 +53,14 @@ public static class Tera9RNG
         throw new ArgumentOutOfRangeException(nameof(gem), gem, null);
     }
 
+    /// <summary>
+    /// Gets the expected Tera Type from the Personal Info and RNG seed.
+    /// </summary>
+    /// <param name="seed">Seed used to generate the Tera Type</param>
+    /// <param name="gem">Encounter specified Gem Type</param>
+    /// <param name="species">Encounter Species</param>
+    /// <param name="form">Encounter Form</param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public static byte GetTeraType(in ulong seed, GemType gem, in ushort species, in byte form)
     {
         if (gem.IsSpecified(out var type))
@@ -61,6 +79,9 @@ public static class Tera9RNG
         throw new ArgumentOutOfRangeException(nameof(gem), gem, null);
     }
 
+    /// <summary>
+    /// Checks if the original Tera Type matches either of the Personal Info types.
+    /// </summary>
     private static bool IsMatchType(IPersonalType pi, in byte original) => original == pi.Type1 || original == pi.Type2;
 
     public static bool IsMatchTeraTypePersonalEgg(in ushort species, in byte form, in byte original) =>
@@ -68,7 +89,16 @@ public static class Tera9RNG
             ? IsMatchTeraTypePersonalAnyForm(species, original)
             : IsMatchTeraTypePersonal(species, form, original);
 
+    /// <inheritdoc cref="IsMatchType"/>
     public static bool IsMatchTeraTypePersonal(in ushort species, in byte form, in byte original) => IsMatchType(PersonalTable.SV[species, form], original);
+
+    /// <summary>
+    /// Checks if the original Tera Type matches any of the Personal Info types for any form it may change into.
+    /// </summary>
+    /// <remarks>Only enter this method if it is permitted to change into all forms.</remarks>
+    /// <param name="species">Encounter Species</param>
+    /// <param name="original">Entity's original Tera Type</param>
+    /// <returns>True if the Tera Type matches any of the Personal Info types</returns>
     public static bool IsMatchTeraTypePersonalAnyForm(in ushort species, in byte original)
     {
         var pt = PersonalTable.SV;
@@ -85,13 +115,68 @@ public static class Tera9RNG
         return false;
     }
 
+    /// <summary>
+    /// Checks if the original Tera Type matches the Personal Info type for the specified form.
+    /// </summary>
+    /// <remarks>Used for HOME imports into <see cref="GameVersion.SV"/>.</remarks>
+    /// <param name="pi">Arrival Personal Info</param>
+    /// <param name="original">Entity's original Tera Type</param>
+    /// <returns>True if the Tera Type matches the expected Personal Info type</returns>
+    private static bool IsMatchTeraTypeImport(PersonalInfo9SV pi, in byte original)
+    {
+        var import = TeraTypeUtil.GetTeraTypeImport(pi.Type1, pi.Type2);
+        return (MoveType)original == import;
+    }
+
+    /// <inheritdoc cref="IsMatchTeraTypeImport"/>
+    public static bool IsMatchTeraTypePersonalImport(in ushort species, in byte form, in byte original)
+    {
+        var pi = PersonalTable.SV[species, form];
+        return IsMatchTeraTypeImport(pi, original);
+    }
+
+    /// <inheritdoc cref="IsMatchTeraTypeImport"/>
+    public static bool IsMatchTeraTypePersonalAnyFormImport(in ushort species, in byte original)
+    {
+        var pt = PersonalTable.SV;
+        var pi = pt.GetFormEntry(species, 0);
+        if (pi.IsPresentInGame && IsMatchTeraTypeImport(pi, original))
+            return true;
+        var fc = pi.FormCount;
+        for (byte form = 1; form < fc; form++)
+        {
+            pi = pt.GetFormEntry(species, form);
+            if (pi.IsPresentInGame && IsMatchTeraTypeImport(pi, original))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the expected Tera Type from the Personal Info and pivot.
+    /// </summary>
+    /// <param name="species">Encounter Species</param>
+    /// <param name="form">Encounter Form</param>
+    /// <param name="pivot">Random pivot to determine which Personal Info type to use</param>
+    /// <returns>Expected Tera Type</returns>
     public static byte GetTeraTypeFromPersonal(in ushort species, in byte form, in ulong pivot)
     {
         var pi = PersonalTable.SV[species, form];
         return pivot == 0 ? pi.Type1 : pi.Type2;
     }
 
-    public static bool IsMatchStarChoice(in uint seed, in byte stars, in byte raidRate, in short randRateMinScarlet, in short randRateMinViolet)
+    /// <summary>
+    /// Compares the Raid Seed to the possible raid bounds to see if the encounter can originate from that seed.
+    /// </summary>
+    /// <remarks>A given raid seed might yield a different encounter or star count, hence why we need to check.</remarks>
+    /// <param name="seed">Random seed used to generate the raid.</param>
+    /// <param name="stars">Difficulty rating.</param>
+    /// <param name="raidRate">Random weight of the raid to be used in the comparison with the game specific min rates.</param>
+    /// <param name="randRateMinScarlet">Total weight of all Scarlet raids prior to this encounter.</param>
+    /// <param name="randRateMinViolet">Total weight of all Violet raids prior to this encounter.</param>
+    /// <param name="map">Parent map the Raid can be obtained on.</param>
+    /// <returns>True if the raid seed can generate the encounter.</returns>
+    public static bool IsMatchStarChoice(in uint seed, in byte stars, in byte raidRate, in short randRateMinScarlet, in short randRateMinViolet, TeraRaidMapParent map)
     {
         // When determining a raid, the game takes the u32 seed and does two rand calls.
         // Rand 1: Star count of the raid (depends on game progress).
@@ -117,7 +202,7 @@ public static class Tera9RNG
         // The inputs to this function have pre-computed the total rate when the encounter is checked.
 
         // If Scarlet...
-        var maxScarlet = EncounterTera9.GetRateTotalBaseSL(stars);
+        var maxScarlet = EncounterTera9.GetRateTotalSL(stars, map);
         {
             var xoro = rand; // copy
             var rateRand = (int)xoro.NextInt((uint)maxScarlet);
@@ -125,7 +210,7 @@ public static class Tera9RNG
                 return true; // Seed can yield this encounter for Scarlet.
         }
         // If Violet..
-        var maxViolet = EncounterTera9.GetRateTotalBaseVL(stars);
+        var maxViolet = EncounterTera9.GetRateTotalVL(stars, map);
         {
             var xoro = rand; // copy
             var rateRand = (int)xoro.NextInt((uint)maxViolet);

@@ -48,13 +48,7 @@ public sealed class PA8 : PKM, ISanityChecksum,
         return data;
     }
 
-    private ushort CalculateChecksum()
-    {
-        ushort chk = 0;
-        for (int i = 8; i < PokeCrypto.SIZE_8ASTORED; i += 2)
-            chk += ReadUInt16LittleEndian(Data.AsSpan(i));
-        return chk;
-    }
+    private ushort CalculateChecksum() => Checksums.Add16(Data.AsSpan()[8..PokeCrypto.SIZE_8ASTORED]);
 
     // Simple Generated Attributes
 
@@ -74,7 +68,7 @@ public sealed class PA8 : PKM, ISanityChecksum,
 
     // Maximums
     public override int MaxIV => 31;
-    public override int MaxEV => 252;
+    public override int MaxEV => EffortValues.Max252;
     public override int MaxStringLengthOT => 12;
     public override int MaxStringLengthNickname => 12;
 
@@ -316,7 +310,7 @@ public sealed class PA8 : PKM, ISanityChecksum,
     public bool RIB47_5 { get => FlagUtil.GetFlag(Data, 0x47, 5); set => FlagUtil.SetFlag(Data, 0x47, 5, value); }
     public bool RIB47_6 { get => FlagUtil.GetFlag(Data, 0x47, 6); set => FlagUtil.SetFlag(Data, 0x47, 6, value); }
     public bool RIB47_7 { get => FlagUtil.GetFlag(Data, 0x47, 7); set => FlagUtil.SetFlag(Data, 0x47, 7, value); }
-    
+
     public int RibbonCount     => BitOperations.PopCount(ReadUInt64LittleEndian(Data.AsSpan(0x34)) & 0b00000000_00011111__11111111_11111111__11111111_11111111__11111111_11111111)
                                 + BitOperations.PopCount(ReadUInt64LittleEndian(Data.AsSpan(0x40)) & 0b00000000_00000000__00000100_00011100__00000000_00000000__00000000_00000000);
     public int MarkCount       => BitOperations.PopCount(ReadUInt64LittleEndian(Data.AsSpan(0x34)) & 0b11111111_11100000__00000000_00000000__00000000_00000000__00000000_00000000)

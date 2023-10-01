@@ -60,6 +60,7 @@ public static class SpeciesCategory
         (int)TypeNull, (int)Silvally, (int)TapuKoko, (int)TapuLele, (int)TapuBulu, (int)TapuFini,
         (int)Kubfu, (int)Urshifu, (int)Regieleki, (int)Regidrago, (int)Glastrier, (int)Spectrier, (int)Enamorus,
         (int)WoChien, (int)ChienPao, (int)TingLu, (int)ChiYu,
+        (int)Okidogi, (int)Munkidori, (int)Fezandipiti, (int)Ogerpon,
     };
 
     /// <summary>
@@ -78,10 +79,13 @@ public static class SpeciesCategory
 
         (int)Wormadam => true, //(F)
         (int)Mothim => true, // (M)
-
+        (int)Vespiquen => true, // (F)
         (int)Gallade => true, // (M)
         (int)Froslass => true, // (F)
+
+        // Species introduced after Gender has been disassociated from PID
         (int)Meowstic => true, // (M/F) form specific
+        (int)Salazzle => true, // (F)
         (int)Oinkologne => true, // (M/F) form specific
 
         _ => false,

@@ -51,7 +51,7 @@ public static class CommonEdits
     /// Sets the <see cref="PKM.Ability"/> value by sanity checking the provided <see cref="PKM.Ability"/> against the possible pool of abilities.
     /// </summary>
     /// <param name="pk">Pokémon to modify.</param>
-    /// <param name="abil">Desired <see cref="PKM.Ability"/> to set.</param>
+    /// <param name="abil">Desired <see cref="Ability"/> value to set.</param>
     public static void SetAbility(this PKM pk, int abil)
     {
         if (abil < 0)
@@ -236,11 +236,6 @@ public static class CommonEdits
             tera.SetTeraType(type);
         }
 
-        if (pk is ITechRecord t)
-        {
-            t.ClearRecordFlags();
-            t.SetRecordFlags(Set.Moves);
-        }
         if (pk is IMoveShop8Mastery s)
             s.SetMoveShopFlags(Set.Moves, pk);
 
@@ -248,6 +243,11 @@ public static class CommonEdits
             pk.Nature = pk.StatNature;
 
         var legal = new LegalityAnalysis(pk);
+        if (pk is ITechRecord t)
+        {
+            t.ClearRecordFlags();
+            t.SetRecordFlags(Set.Moves, legal.Info.EvoChainsAllGens.Get(pk.Context));
+        }
         if (legal.Parsed && !MoveResult.AllValid(legal.Info.Relearn))
             pk.SetRelearnMoves(legal);
         pk.ResetPartyStats();
@@ -309,11 +309,11 @@ public static class CommonEdits
     public static int GetMaximumEV(this PKM pk, int index)
     {
         if (pk.Format < 3)
-            return ushort.MaxValue;
+            return EffortValues.Max12;
 
         var sum = pk.EVTotal - pk.GetEV(index);
-        int remaining = 510 - sum;
-        return Math.Clamp(remaining, 0, 252);
+        int remaining = EffortValues.Max510 - sum;
+        return Math.Clamp(remaining, 0, EffortValues.Max252);
     }
 
     /// <summary>
@@ -403,7 +403,7 @@ public static class CommonEdits
     /// <param name="la">Precomputed optional</param>
     public static void SetDefaultNickname(this PKM pk, LegalityAnalysis la)
     {
-        if (la is { Parsed: true, EncounterOriginal: EncounterTrade {HasNickname: true} t })
+        if (la is { Parsed: true, EncounterOriginal: IFixedNickname {IsFixedNickname: true} t })
             pk.SetNickname(t.GetNickname(pk.Language));
         else
             pk.ClearNickname();

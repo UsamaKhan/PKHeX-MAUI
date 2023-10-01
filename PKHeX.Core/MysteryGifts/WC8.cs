@@ -7,7 +7,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 8 Mystery Gift Template File
 /// </summary>
-public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDynamaxLevel, IRibbonIndex, IMemoryOT, ILangNicknamedTemplate, IEncounterServerDate,
+public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDynamaxLevel, IRibbonIndex, IMemoryOT, ILangNicknamedTemplate, IEncounterServerDate, IRestrictVersion,
     IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetCommon7, IRibbonSetCommon8, IRibbonSetMark8
 {
     public const int Size = 0x2D0;
@@ -537,27 +537,26 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
     private DateOnly GetSuggestedDate()
     {
         if (!IsDateRestricted)
-            return DateOnly.FromDateTime(DateTime.Now);
+            return EncounterDate.GetDateSwitch();
         if (EncounterServerDate.WC8GiftsChk.TryGetValue(Checksum, out var range))
             return range.Start;
         if (EncounterServerDate.WC8Gifts.TryGetValue(CardID, out range))
             return range.Start;
-        return DateOnly.FromDateTime(DateTime.Now);
+        return EncounterDate.GetDateSwitch();
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PK8 pk)
     {
         pk.IsEgg = true;
-        pk.EggMetDate = DateOnly.FromDateTime(DateTime.Now);
+        pk.EggMetDate = EncounterDate.GetDateSwitch();
         pk.Nickname = SpeciesName.GetEggName(pk.Language, Generation);
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK8 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.SWSH.GetFormEntry(Species, Form);
-        pk.Nature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
-        pk.StatNature = pk.Nature;
+        var pi = pk.PersonalInfo;
+        pk.Nature = pk.StatNature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
         pk.RefreshAbility(av);
@@ -614,7 +613,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         return pid;
     }
 
-    private void SetPID(PKM pk)
+    private void SetPID(PK8 pk)
     {
         pk.PID = GetPID(pk, PIDType);
     }
@@ -733,12 +732,26 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         if (pk is PK8 pk8 && pk8.DynamaxLevel < DynamaxLevel)
             return false;
 
-        if (IsHOMEGift && pk is IScaledSize s and not IHomeTrack { HasTracker: true } && ParseSettings.IgnoreTransferIfNoTracker)
+        if (IsHOMEGift)
         {
-            if (s.HeightScalar != 0)
-                return false;
-            if (s.WeightScalar != 0)
-                return false;
+            // Prior to 3.0.0, HOME would set the Height and Weight exactly and not give a random value if it was 0.
+            // However, entering HOME will re-randomize the Height and Weight.
+            if (pk.MetDate is { } x && IsHOMEGiftOld(x))
+            {
+                // Need to defer and not mismatch date ranges.
+                if (!EncounterServerDate.IsValidDateWC8(this, x))
+                    return false;
+
+                if (pk.Context is not (EntityContext.Gen8 or EntityContext.Gen8b))
+                {
+                    // Only these 3 can transfer to PLA and get 0 scale prior to 3.0.0
+                    if (Species is not ((ushort)Core.Species.Pikachu or (ushort)Core.Species.Eevee or (ushort)Core.Species.Rotom or (ushort)Core.Species.Pichu))
+                    {
+                        if (pk is IScaledSize { HeightScalar: 0, WeightScalar: 0 })
+                            return false;
+                    }
+                }
+            }
         }
 
         // Duplicate card; one with Nickname specified and another without.
@@ -766,7 +779,7 @@ public sealed class WC8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
 
     public bool IsDateRestricted => IsHOMEGift;
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => false; // no version compatibility checks yet.
 
     #region Lazy Ribbon Implementation

@@ -140,7 +140,7 @@ public sealed class LegalityAnalysis
         if (info.EncounterOriginal is not EncounterInvalid enc)
             return false;
         if (enc.Generation <= 3)
-            return true;
+            return pk.Format <= 3;
         if (!pk.FatefulEncounter)
             return false;
         if (enc.Generation < 6)
@@ -223,7 +223,6 @@ public sealed class LegalityAnalysis
     private void ParsePK5()
     {
         UpdateChecks();
-        NHarmonia.Verify(this);
         if (Entity.Format >= 8)
             Transfer.VerifyTransferLegalityG8(this);
     }

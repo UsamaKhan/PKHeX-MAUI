@@ -17,6 +17,7 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
     public string SaveRevisionString => (Japanese ? "J" : !Korean ? "U" : "K") + (IsVirtualConsole ? "VC" : "GB");
     public bool Japanese { get; }
     public bool Korean { get; }
+    public override int Language => Japanese ? 1 : Korean ? (int)LanguageID.Korean : -1;
 
     public override PersonalTable2 Personal { get; }
     public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_GSC;
@@ -279,7 +280,7 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
     public int EventFlagCount => 2000;
 
     public override int BoxCount => Japanese ? 9 : 14;
-    public override int MaxEV => 65535;
+    public override int MaxEV => EffortValues.Max12;
     public override int MaxIV => 15;
     public override int Generation => 2;
     public override EntityContext Context => EntityContext.Gen2;
@@ -308,17 +309,22 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
         WriteUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition2), accum);
     }
 
-    public override bool ChecksumsValid
+    public override bool ChecksumsValid => !ChecksumInfo.Contains("Invalid");
+
+    public override string ChecksumInfo
     {
         get
         {
             ushort accum = GetChecksum();
             ushort actual = ReadUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition));
-            return accum == actual;
+            ushort actual2 = ReadUInt16LittleEndian(Data.AsSpan(Offsets.OverallChecksumPosition2));
+
+            bool checksum1Valid = (accum == actual);
+            bool checksum2Valid = (accum == actual2);
+            static string valid(bool s) => s ? "Valid" : "Invalid";
+            return $"Checksum 1 {valid(checksum1Valid)}, Checksum 2 {valid(checksum2Valid)}.";
         }
     }
-
-    public override string ChecksumInfo => ChecksumsValid ? "Checksum valid." : "Checksum invalid";
 
     // Trainer Info
     public override GameVersion Version { get; protected set; }
@@ -714,16 +720,16 @@ public sealed class SAV2 : SaveFile, ILangDeviantSave, IEventFlagArray, IEventWo
 
     private ushort GetResetKey()
     {
-        var value = (TID16 >> 8) + (TID16 & 0xFF) + ((Money >> 16) & 0xFF) + ((Money >> 8) & 0xFF) + (Money & 0xFF);
-        var ot = Data.AsSpan(Offsets.Trainer1 + 2, 5);
-        var sum = 0;
-        foreach (var b in ot)
-        {
-            if (b == StringConverter12.G1TerminatorCode)
-                break;
-            sum += b;
-        }
-        return (ushort)(value + sum);
+        ushort result = 0;
+        foreach (var b in Data.AsSpan(Offsets.Money, 3))
+            result += b;
+        var tr = Data.AsSpan(Offsets.Trainer1, 7);
+        var end = tr[2..].IndexOf(StringConverter12.G1TerminatorCode);
+        if (end >= 0)
+            tr = tr[..(end + 2)];
+        foreach (var b in tr)
+            result += b;
+        return result;
     }
 
     /// <summary>

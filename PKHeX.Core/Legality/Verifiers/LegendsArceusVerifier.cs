@@ -63,11 +63,14 @@ public sealed class LegendsArceusVerifier : Verifier
         if (moveCount == 4)
             return;
 
+        // Flag move slots that are empty.
+        if (pa.Tracker != 0 || !ParseSettings.IgnoreTransferIfNoTracker)
+            return; // Can delete moves in PA8 moveset via HOME.
+
         // Get the bare minimum moveset.
         Span<ushort> expect = stackalloc ushort[4];
         var minMoveCount = LoadBareMinimumMoveset(data.EncounterMatch, data.Info.EvoChainsAllGens, pa, expect);
 
-        // Flag move slots that are empty.
         var moves = data.Info.Moves;
         for (int i = moveCount; i < minMoveCount; i++)
         {
@@ -164,14 +167,13 @@ public sealed class LegendsArceusVerifier : Verifier
         return ctr;
     }
 
-    private static int GetMoveCount(PKM pa)
+    private static int GetMoveCount(PA8 pa)
     {
         var count = 0;
-        for (int i = 0; i < 4; i++)
-        {
-            if (pa.GetMove(i) is not 0)
-                count++;
-        }
+        if (pa.Move1 != 0) count++;
+        if (pa.Move2 != 0) count++;
+        if (pa.Move3 != 0) count++;
+        if (pa.Move4 != 0) count++;
         return count;
     }
 

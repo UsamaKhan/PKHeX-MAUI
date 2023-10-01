@@ -85,6 +85,9 @@ public sealed class GameDataPK8 : HomeOptional1, IGameDataSide<PK8>, IGigantamax
         pk.PKRS = PKRS;
         pk.AbilityNumber = AbilityNumber;
         pk.Ability = Ability;
+
+        if (!IsOriginallySWSH(pkh.Version, pk.Met_Location))
+            pk.Version = LocationsHOME.GetVersionSWSH(pkh.Version);
     }
 
     public void CopyFrom(PK8 pk, PKH pkh)
@@ -100,6 +103,20 @@ public sealed class GameDataPK8 : HomeOptional1, IGameDataSide<PK8>, IGigantamax
         PKRS = pk.PKRS;
         AbilityNumber = (byte)pk.AbilityNumber;
         Ability = (ushort)pk.Ability;
+    }
+
+    public void CopyFrom(PK7 pk, PKH pkh)
+    {
+        this.CopyFrom(pk);
+        PKRS = pk.PKRS;
+        AbilityNumber = (byte)pk.AbilityNumber;
+        Ability = (ushort)pk.Ability;
+
+        pkh.MarkValue &= 0b1111_1111_1111;
+        if (!pk.IsNicknamed)
+            pkh.Nickname = SpeciesName.GetSpeciesNameGeneration(pk.Species, pk.Language, 8);
+        if (FormInfo.IsTotemForm(pk.Species, pk.Form))
+            pkh.Form = FormInfo.GetTotemBaseForm(pk.Species, pk.Form);
     }
 
     public PK8 ConvertToPKM(PKH pkh)
@@ -187,7 +204,7 @@ public sealed class GameDataPK8 : HomeOptional1, IGameDataSide<PK8>, IGigantamax
             return;
 
         met = remap;
-        egg = LocationsHOME.SWSHEgg;
+        egg = egg is 0 or Locations.Default8bNone ? 0 : LocationsHOME.SWSHEgg;
     }
 
     private static bool IsOriginallySWSH(int ver, int loc) => ver is (int)GameVersion.SW or (int)GameVersion.SH && !IsFakeMetLocation(loc);

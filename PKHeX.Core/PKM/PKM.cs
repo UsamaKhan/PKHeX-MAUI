@@ -27,7 +27,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public readonly byte[] Data; // Raw Storage
 
     protected PKM(byte[] data) => Data = data;
-    protected PKM(int size) => Data = new byte[size];
+    protected PKM([ConstantExpected] int size) => Data = new byte[size];
 
     public virtual byte[] EncryptedPartyData => Encrypt().AsSpan(0, SIZE_PARTY).ToArray();
     public virtual byte[] EncryptedBoxData => Encrypt().AsSpan(0, SIZE_STORED).ToArray();
@@ -318,7 +318,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         }
     }
 
-    public bool PKRS_Infected { get => PKRS_Days != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
+    public bool PKRS_Infected { get => PKRS_Days != 0 || PKRS_Strain != 0; set => PKRS_Strain = value ? Math.Max(PKRS_Strain, 1) : 0; }
 
     public bool PKRS_Cured
     {
@@ -455,6 +455,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         Move2 = value.Move2;
         Move3 = value.Move3;
         Move4 = value.Move4;
+        this.SetMaximumPPCurrent(value);
     }
 
     public void SetMoves(ReadOnlySpan<ushort> value)
@@ -463,6 +464,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         Move2 = value.Length > 1 ? value[1] : default;
         Move3 = value.Length > 2 ? value[2] : default;
         Move4 = value.Length > 3 ? value[3] : default;
+        this.SetMaximumPPCurrent(value);
     }
 
     public ushort[] RelearnMoves
@@ -896,16 +898,16 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     }
 
     /// <inheritdoc cref="SetRandomIVs(Span{int},int)"/>
-    public void SetRandomIVs(int minFlawless = -1) => SetRandomIVs(stackalloc int[6], minFlawless);
+    public void SetRandomIVs(int minFlawless = 0) => SetRandomIVs(stackalloc int[6], minFlawless);
 
     /// <summary>
     /// Randomizes the IVs within game constraints.
     /// </summary>
     /// <param name="ivs">Temporary variable storage</param>
     /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
-    public void SetRandomIVs(Span<int> ivs, int minFlawless = -1)
+    public void SetRandomIVs(Span<int> ivs, int minFlawless = 0)
     {
-        if (Version == (int)GameVersion.GO && minFlawless != 6)
+        if (Version == (int)GameVersion.GO)
         {
             SetRandomIVsGO(ivs);
             return;
@@ -915,10 +917,9 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         for (int i = 0; i < 6; i++)
             ivs[i] = rnd.Next(MaxIV + 1);
 
-        int count = minFlawless == -1 ? GetFlawlessIVCount() : minFlawless;
-        if (count != 0)
+        if (minFlawless != 0)
         {
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < minFlawless; i++)
                 ivs[i] = MaxIV;
             rnd.Shuffle(ivs); // Randomize IV order
         }
@@ -936,59 +937,6 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
         ivs[2] = ivs[5] = (rnd.Next(minIV, maxIV + 1) << 1) | 1; // defense
         ivs[3] = rnd.Next(MaxIV + 1); // speed
         SetIVs(ivs);
-    }
-
-    /// <summary>
-    /// Randomizes the IVs within game constraints.
-    /// </summary>
-    /// <param name="template">IV template to generate from</param>
-    /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
-    /// <returns>Randomized IVs if desired.</returns>
-    public void SetRandomIVsTemplate(IndividualValueSet template, int minFlawless = -1)
-    {
-        int count = minFlawless == -1 ? GetFlawlessIVCount() : minFlawless;
-        Span<int> ivs = stackalloc int[6];
-        var rnd = Util.Rand;
-        do
-        {
-            for (int i = 0; i < 6; i++)
-                ivs[i] = template[i] < 0 ? rnd.Next(MaxIV + 1) : template[i];
-        } while (ivs.Count(MaxIV) < count);
-
-        SetIVs(ivs);
-    }
-
-    /// <summary>
-    /// Gets the amount of flawless IVs that the <see cref="PKM"/> should have.
-    /// </summary>
-    /// <returns>Count of IVs that should be max.</returns>
-    public int GetFlawlessIVCount()
-    {
-        int gen = Generation;
-        if (gen >= 6)
-        {
-            var species = Species;
-            if (SpeciesCategory.IsMythical(species))
-                return 3;
-            if (SpeciesCategory.IsLegendary(species))
-                return 3;
-            if (SpeciesCategory.IsSubLegendary(species))
-                return 3;
-            if (gen <= 7 && SpeciesCategory.IsUltraBeast(species))
-                return 3;
-        }
-        if (XY)
-        {
-            if (PersonalInfo.EggGroup1 == 15) // Undiscovered
-                return 3;
-            if (Met_Location == 148 && Met_Level == 30) // Friend Safari
-                return 2;
-        }
-        if (VC)
-            return Species is (int)Core.Species.Mew or (int)Core.Species.Celebi ? 5 : 3;
-        if (this is IAlpha {IsAlpha: true})
-            return 3;
-        return 0;
     }
 
     /// <summary>

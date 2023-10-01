@@ -145,7 +145,8 @@ public sealed class ShowdownSet : IBattleTemplate
     // We will handle this 1-2 letter edge case only if the line is the first line of the set, in the rare chance we are importing for a non-English language?
     private const int MinLength = 3;
     private const int MaxLength = 80;
-    private static bool IsLengthOutOfRange(ReadOnlySpan<char> trim) => (uint)(trim.Length - MinLength) > MaxLength + MinLength;
+    private static bool IsLengthOutOfRange(ReadOnlySpan<char> trim) => IsLengthOutOfRange(trim.Length);
+    private static bool IsLengthOutOfRange(int length) => (uint)(length - MinLength) > MaxLength - MinLength;
 
     private void ParseLines(SpanLineEnumerator lines)
     {
@@ -298,7 +299,8 @@ public sealed class ShowdownSet : IBattleTemplate
         var val = Util.ToInt32(value);
         if ((uint)val > 10)
             return false;
-        return (DynamaxLevel = (byte)val) is (>= 0 and <= 10);
+        DynamaxLevel = (byte)val;
+        return true;
     }
 
     private bool ParseTeraType(ReadOnlySpan<char> value)

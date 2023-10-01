@@ -224,7 +224,7 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
     #region Maximums
 
     public override int MaxIV => 31;
-    public override int MaxEV => 252;
+    public override int MaxEV => EffortValues.Max252;
     public override int MaxStringLengthOT => 12;
     public override int MaxStringLengthNickname => 12;
     public override ushort MaxMoveID => Legal.MaxMoveID_8a;
@@ -236,8 +236,8 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
 
     #endregion
 
-    public override int SIZE_PARTY => HomeCrypto.SIZE_2STORED;
-    public override int SIZE_STORED => HomeCrypto.SIZE_2STORED;
+    public override int SIZE_PARTY => HomeCrypto.SIZE_3STORED;
+    public override int SIZE_STORED => HomeCrypto.SIZE_3STORED;
     public override bool Valid { get => true; set { } }
     public override PersonalInfo PersonalInfo => LatestGameData.GetPersonalInfo(Species, Form);
     public override void RefreshChecksum() => Checksum = 0;
@@ -308,7 +308,13 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
 
     public IGameDataSide LatestGameData => OriginalGameData() ?? GetFallbackGameData();
 
-    private IGameDataSide GetFallbackGameData() => Version switch
+    private IGameDataSide GetFallbackGameData() => DataPB7
+                                                ?? DataPK9
+                                                ?? DataPB8
+                                                ?? DataPA8
+                                                ?? DataPK8 ?? CreateFallback();
+
+    private IGameDataSide CreateFallback() => Version switch
     {
         (int)GP or (int)GE => DataPB7 ??= new(),
         (int)BD or (int)SP => DataPB8 ??= new(),
@@ -319,6 +325,7 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
 
     private IGameDataSide? OriginalGameData() => Version switch
     {
+        (int)GameVersion.GO when DataPB7 is not null => DataPB7,
         (int)GP or (int)GE => DataPB7,
         (int)BD or (int)SP => DataPB8,
         (int)PLA           => DataPA8,
@@ -378,6 +385,7 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
     {
         Core.CopyFrom(pk);
              if (pk is PB7 pb7) (DataPB7 ??= new GameDataPB7()).CopyFrom(pb7, this);
+        else if (pk is PK7 pk7) (DataPK8 ??= new GameDataPK8()).CopyFrom(pk7, this);
         else if (pk is PK8 pk8) (DataPK8 ??= new GameDataPK8()).CopyFrom(pk8, this);
         else if (pk is PB8 pb8) (DataPB8 ??= new GameDataPB8()).CopyFrom(pb8, this);
         else if (pk is PA8 pa8) (DataPA8 ??= new GameDataPA8()).CopyFrom(pa8, this);
@@ -388,7 +396,17 @@ public sealed class PKH : PKM, IHandlerLanguage, IFormArgument, IHomeTrack, IBat
 
     private void EnsureScaleSizeExists()
     {
-        if (FirstScaleData is IScaledSize3)
+        if (Core.RibbonMarkAlpha)
+        {
+            // Fix for PLA static encounter Alphas with 127 scale.
+            Core.HeightScalar = Core.WeightScalar = 255;
+            if (DataPA8 is { Scale: not 255 } pa8)
+                pa8.Scale = 255;
+            if (DataPK9 is { Scale: not 255 } pk9)
+                pk9.Scale = 255;
+            return;
+        }
+        if (GO_HOME || FirstScaleData is IScaledSize3)
             return; // data exists for scale, keep values.
         while (HeightScalar == 0 && WeightScalar == 0)
         {

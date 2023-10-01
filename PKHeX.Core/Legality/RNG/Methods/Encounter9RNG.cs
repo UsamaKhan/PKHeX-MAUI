@@ -27,7 +27,7 @@ public static class Encounter9RNG
 
             var type = Tera9RNG.GetTeraType(seed, enc.TeraType, enc.Species, enc.Form);
             pk.TeraTypeOriginal = (MoveType)type;
-            if (criteria.TeraType != -1 && type != criteria.TeraType)
+            if (criteria.TeraType != -1 && type != criteria.TeraType && TeraTypeUtil.CanChangeTeraType(enc.Species))
                 pk.SetTeraType((MoveType)criteria.TeraType); // sets the override type
             return true; // done.
         }
@@ -47,7 +47,7 @@ public static class Encounter9RNG
 
             var type = Tera9RNG.GetTeraType(seed, enc.TeraType, enc.Species, enc.Form);
             pk.TeraTypeOriginal = (MoveType)type;
-            if (criteria.TeraType != -1 && type != criteria.TeraType)
+            if (criteria.TeraType != -1 && type != criteria.TeraType && TeraTypeUtil.CanChangeTeraType(enc.Species))
                 pk.SetTeraType((MoveType)criteria.TeraType); // sets the override type
             return true; // done.
         }
@@ -65,6 +65,7 @@ public static class Encounter9RNG
         pk.PID = GetAdaptedPID(ref rand, pk, enc);
 
         const int UNSET = -1;
+        const int MAX = 31;
         Span<int> ivs = stackalloc[] { UNSET, UNSET, UNSET, UNSET, UNSET, UNSET };
         if (enc.IVs.IsSpecified)
         {
@@ -72,7 +73,6 @@ public static class Encounter9RNG
         }
         else
         {
-            const int MAX = 31;
             for (int i = 0; i < enc.FlawlessIVs; i++)
             {
                 int index;
@@ -82,13 +82,14 @@ public static class Encounter9RNG
             }
         }
 
-        if (!ignoreIVs && !criteria.IsIVsCompatible(ivs, 9))
-            return false;
         for (int i = 0; i < 6; i++)
         {
             if (ivs[i] == UNSET)
-                ivs[i] = (int)rand.NextInt(32);
+                ivs[i] = (int)rand.NextInt(MAX + 1);
         }
+
+        if (!ignoreIVs && !criteria.IsIVsCompatibleSpeedLast(ivs, 9))
+            return false;
 
         pk.IV_HP = ivs[0];
         pk.IV_ATK = ivs[1];
@@ -113,7 +114,7 @@ public static class Encounter9RNG
             PersonalInfo.RatioMagicMale => 0,
             _ => GetGender(gender_ratio, rand.NextInt(100)),
         };
-        if (criteria.Gender != -1 && gender != criteria.Gender)
+        if (criteria.Gender != FixedGenderUtil.GenderRandom && gender != criteria.Gender)
             return false;
         pk.Gender = gender;
 
@@ -220,8 +221,16 @@ public static class Encounter9RNG
         // Scale
         {
             var value = enc.ScaleType.GetSizeValue(enc.Scale, ref rand);
-            if (pk is IScaledSize3 s && s.Scale != value)
-                return false;
+            if (pk is IScaledSize3 s)
+            {
+                if (s.Scale != value)
+                    return false;
+            }
+            else if (pk is IScaledSize s2)
+            {
+                if (s2.HeightScalar != value)
+                    return false;
+            }
         }
         return true;
     }

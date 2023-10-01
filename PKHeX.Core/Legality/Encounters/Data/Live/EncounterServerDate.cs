@@ -36,6 +36,7 @@ public static class EncounterServerDate
         WA8 wa8 => Result(IsValidDateWA8(wa8, obtained)),
         WB8 wb8 => Result(IsValidDateWB8(wb8, obtained)),
         WC9 wc9 => Result(IsValidDateWC9(wc9, obtained)),
+        EncounterSlot8GO g8 => Result(g8.IsWithinDistributionWindow(obtained)),
         _ => throw new ArgumentOutOfRangeException(nameof(enc)),
     };
 
@@ -171,11 +172,18 @@ public static class EncounterServerDate
         {1513, (new(2023, 02, 27), new(2024, 03, 01))}, // Hisuian Zoroark DLC Purchase Gift
         {0502, (new(2023, 03, 31), new(2023, 07, 01))}, // TCG Flying Lechonk
         {0503, (new(2023, 04, 13), new(2023, 04, 18))}, // Gavin's Palafin (-1 start date tolerance for GMT-10 regions)
-        {0025, (new(2023, 04, 21), new(2023, 07, 01))}, // Pokémon Center Pikachu (Mini & Jumbo)
+        {0025, (new(2023, 04, 21), new(2023, 08, 01))}, // Pokémon Center Pikachu (Mini & Jumbo)
         {1003, (new(2023, 05, 29), new(2023, 08, 01))}, // Arceus and the Jewel of Life Distribution - Pokémon Store Tie-In Bronzong
         {1002, (new(2023, 05, 31), new(2023, 08, 01))}, // Arceus and the Jewel of Life Distribution Pichu
         {0028, (new(2023, 06, 09), new(2023, 06, 12))}, // そらみつ's Bronzong (-1 start date tolerance for GMT-10 regions)
         {1005, (new(2023, 06, 16), new(2023, 06, 20))}, // 정원석's Gastrodon (-1 start date tolerance for GMT-10 regions)
+        {0504, (new(2023, 06, 30), new(2023, 07, 04))}, // Paul's Shiny Arcanine
+        {1522, (new(2023, 07, 21), new(2023, 09, 01))}, // Dark Tera Type Charizard
+        {0024, (new(2023, 07, 26), new(2023, 08, 19))}, // Nontaro's Shiny Grimmsnarl
+        {0505, (new(2023, 08, 07), new(2023, 09, 01))}, // WCS 2023 Stretchy Form Tatsugiri
+        {1521, (new(2023, 08, 08), new(2023, 09, 19))}, // My Very Own Mew
+        {0506, (new(2023, 08, 10), new(2023, 08, 15))}, // Eduardo Gastrodon
+        {1524, (new(2023, 09, 06), new(2024, 09, 01))}, // Glaseado Cetitan
 
         {9021, HOME3_ML}, // Hidden Ability Sprigatito
         {9022, HOME3_ML}, // Hidden Ability Fuecoco

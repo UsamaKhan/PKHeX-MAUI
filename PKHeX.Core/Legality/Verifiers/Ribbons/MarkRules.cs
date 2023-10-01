@@ -11,20 +11,20 @@ public static class MarkRules
     /// <summary>
     /// Checks if an encounter-only mark is possible to obtain for the encounter, if not lost via data manipulation.
     /// </summary>
-    public static bool IsEncounterMarkAllowed(LegalityAnalysis data)
+    public static bool IsEncounterMarkAllowed(IEncounterTemplate enc, PKM pk)
     {
-        if (IsEncounterMarkLost(data))
+        if (IsEncounterMarkLost(enc, pk))
             return false;
-        return data.Info.EncounterOriginal.Context is EntityContext.Gen8 or EntityContext.Gen9;
+        return enc.Context is EntityContext.Gen8 or EntityContext.Gen9;
     }
 
     /// <summary>
     /// Checks if original marks and ribbons are lost via data manipulation.
     /// </summary>
-    public static bool IsEncounterMarkLost(LegalityAnalysis data)
+    public static bool IsEncounterMarkLost(IEncounterTemplate enc, PKM pk)
     {
         // Nincada -> Shedinja loses all ribbons and marks, but does not purge any Affixed Ribbon value.
-        return data.EncounterOriginal.Species is (int)Species.Nincada && data.Entity.Species == (int)Species.Shedinja;
+        return enc.Species is (int)Species.Nincada && pk.Species == (int)Species.Shedinja;
     }
 
     /// <summary>
@@ -34,6 +34,7 @@ public static class MarkRules
     {
         EncounterSlot8 or EncounterStatic8 { Gift: false, ScriptedNoMarks: false } => IsMarkAllowedSpecific8(mark, pk, enc),
         EncounterSlot9 s => IsMarkAllowedSpecific9(mark, s),
+        EncounterStatic9 s => IsMarkAllowedSpecific9(mark, s),
         WC9 wc9 => wc9.GetRibbonIndex(mark),
         _ => false,
     };
@@ -66,6 +67,16 @@ public static class MarkRules
         _ => true,
     };
 
+    /// <summary>
+    /// Checks if a specific encounter mark is disallowed.
+    /// </summary>
+    /// <returns>False if mark is disallowed based on specific conditions.</returns>
+    public static bool IsMarkAllowedSpecific9(RibbonIndex mark, EncounterStatic9 s) => mark switch
+    {
+        MarkCrafty => s.RibbonMarkCrafty,
+        _ => false,
+    };
+
     // Encounter slots check location weather, while static encounters check weather per encounter.
     private static bool IsWeatherPermitted8(RibbonIndex mark, IEncounterTemplate enc) => enc switch
     {
@@ -76,7 +87,7 @@ public static class MarkRules
 
     private static bool IsSlotWeatherPermittedSWSH(AreaWeather8 permit, EncounterSlot8 s)
     {
-        var location = s.Location;
+        var location = s.Parent.Location;
         // If it's not in the main table, it can only have Normal weather.
         if (!EncounterArea8.WeatherbyArea.TryGetValue(location, out var weather))
             weather = AreaWeather8.Normal;
@@ -88,7 +99,7 @@ public static class MarkRules
             return false;
 
         // Check bleed conditions otherwise.
-        return EncounterArea8.IsWeatherBleedPossible(s.SlotType, permit, location);
+        return EncounterArea8.IsWeatherBleedPossible(s.Type, permit, location);
     }
 
     /// <summary>
@@ -125,7 +136,7 @@ public static class MarkRules
             return true;
 
         // Before HOME 3.0.0, this mark was never set.
-        return pk is PK8 or PB8 or PA8; // Not yet touched HOME 3.0.0
+        return wasAlpha && pk is PK8 or PB8 or PA8; // Not yet touched HOME 3.0.0
     }
 
     /// <summary>
@@ -142,10 +153,13 @@ public static class MarkRules
     /// </summary>
     public static bool IsMarkAllowedJumbo(EvolutionHistory evos, PKM pk)
     {
+        const byte expect = byte.MaxValue;
         if (!evos.HasVisitedGen9)
             return false;
         if (pk is IScaledSize3 s)
-            return s.Scale == byte.MaxValue;
+            return s.Scale == expect;
+        if (pk is IScaledSize s2)
+            return s2.HeightScalar == expect;
         return false;
     }
 
@@ -154,10 +168,13 @@ public static class MarkRules
     /// </summary>
     public static bool IsMarkAllowedMini(EvolutionHistory evos, PKM pk)
     {
+        const byte expect = byte.MinValue;
         if (!evos.HasVisitedGen9)
             return false;
         if (pk is IScaledSize3 s)
-            return s.Scale == 0;
+            return s.Scale == expect;
+        if (pk is IScaledSize s2)
+            return s2.HeightScalar == expect;
         return false;
     }
 
@@ -180,6 +197,18 @@ public static class MarkRules
     }
 
     /// <summary>
+    /// Checks if the input's <see cref="IRibbonSetMark9.RibbonMarkMightiest"/> mark state is valid.
+    /// </summary>
+    public static bool IsMarkValidMightiest(IEncounterTemplate enc, bool hasMark, EvolutionHistory evos)
+    {
+        if (IsMarkPresentMightiest(enc))
+            return hasMark;
+        if (enc.Species == (int)Species.Mew && evos.HasVisitedGen9)
+            return true; // Can be awarded the mark for battling Mewtwo.
+        return !hasMark;
+    }
+
+    /// <summary>
     /// Checks if the input should have the <see cref="IRibbonSetMark9.RibbonMarkTitan"/> mark.
     /// </summary>
     public static bool IsMarkPresentTitan(IEncounterTemplate enc)
@@ -191,7 +220,7 @@ public static class MarkRules
     /// <summary>
     /// Checks if the input should have the <see cref="IRibbonSetMark9.RibbonMarkItemfinder"/> mark.
     /// </summary>
-    public static bool IsMarkValidItemFinder(EvolutionHistory evos) => false; // evos.HasVisitedGen9;
+    public static bool IsMarkValidItemFinder(EvolutionHistory evos) => evos.HasVisitedGen9; // Obtainable starting in DLC1.
 
     /// <summary>
     /// Checks if the input should have the <see cref="IRibbonSetMark9.RibbonMarkPartner"/> mark.
@@ -201,9 +230,12 @@ public static class MarkRules
     /// <summary>
     /// Gets the maximum obtainable <see cref="RibbonIndex"/> value for the format.
     /// </summary>
-    public static RibbonIndex GetMaxAffixValue(int entityFormat, bool visitedHOME) => entityFormat switch
+    public static RibbonIndex GetMaxAffixValue(EvolutionHistory evos)
     {
-        <= 8 when !visitedHOME => MarkSlump, // Pioneer and Twinkling Star cannot be selected in SW/SH.
-        _ => MarkTitan, // Max ribbon visible in SV.
-    };
+        if (evos.HasVisitedGen9)
+            return MarkTitan;
+        if (evos.HasVisitedSWSH)
+            return MarkSlump; // Pioneer and Twinkling Star cannot be selected in SW/SH.
+        return unchecked((RibbonIndex)(-1));
+    }
 }

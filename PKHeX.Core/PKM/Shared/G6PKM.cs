@@ -1,5 +1,5 @@
 using System;
-using static System.Buffers.Binary.BinaryPrimitives;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
@@ -9,7 +9,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
     public override int SIZE_PARTY => PokeCrypto.SIZE_6PARTY;
     public override int SIZE_STORED => PokeCrypto.SIZE_6STORED;
     protected G6PKM(byte[] data) : base(data) { }
-    protected G6PKM(int size) : base(size) { }
+    protected G6PKM([ConstantExpected] int size) : base(size) { }
 
     // Trash Bytes
     public sealed override Span<byte> Nickname_Trash => Data.AsSpan(0x40, 26);
@@ -22,13 +22,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
     public sealed override bool ChecksumValid => CalculateChecksum() == Checksum;
     public sealed override bool Valid { get => Sanity == 0 && ChecksumValid; set { if (!value) return; Sanity = 0; RefreshChecksum(); } }
 
-    private ushort CalculateChecksum()
-    {
-        ushort chk = 0;
-        for (int i = 8; i < PokeCrypto.SIZE_6STORED; i += 2) // don't use SIZE_STORED property; pb7 overrides stored size
-            chk += ReadUInt16LittleEndian(Data.AsSpan(i));
-        return chk;
-    }
+    private ushort CalculateChecksum() => Checksums.Add16(Data.AsSpan()[8..PokeCrypto.SIZE_6STORED]);
 
     // Simple Generated Attributes
     public sealed override int CurrentFriendship
@@ -106,7 +100,7 @@ public abstract class G6PKM : PKM, ISanityChecksum
 
     // Maximums
     public sealed override int MaxIV => 31;
-    public sealed override int MaxEV => 252;
+    public sealed override int MaxEV => EffortValues.Max252;
     public sealed override int MaxStringLengthOT => 12;
     public sealed override int MaxStringLengthNickname => 12;
 }
@@ -116,5 +110,5 @@ public interface ISuperTrain
     uint SuperTrainBitFlags { get; set; }
     bool SecretSuperTrainingUnlocked { get; set; }
     bool SecretSuperTrainingComplete { get; set; }
-    int SuperTrainingMedalCount(int maxCount = 30);
+    int SuperTrainingMedalCount(int lowBitCount = 30);
 }

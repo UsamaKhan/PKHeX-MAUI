@@ -37,8 +37,8 @@ public static class EntityConverter
     /// <returns>True if can be converted to the requested format value.</returns>
     public static bool IsConvertibleToFormat(PKM pk, int format)
     {
-        if (pk.Format >= 3 && pk.Format > format)
-            return false; // pk3->upward can't go backwards
+        if (pk.Format >= 3 && pk.Format > format && format < 8)
+            return false; // pk3->upward can't go backwards until Gen8+
         if (pk.Format <= 2 && format is > 2 and < 7)
             return false; // pk1/2->upward has to be 7 or greater
         return true;
@@ -133,7 +133,6 @@ public static class EntityConverter
         PK4 pk4 => pk4.ConvertToPK5(),
         PK5 pk5 => pk5.ConvertToPK6(),
         PK6 pk6 => pk6.ConvertToPK7(),
-        PK7 pk7 => pk7.ConvertToPK8(),
 
         // Side-Formats back to Mainline
         SK2 sk2 => sk2.ConvertToPK2(),
@@ -150,7 +149,13 @@ public static class EntityConverter
         // Every format can eventually feed into HOME. Don't bother checking current type.
         var type = PKH.GetType(destType);
         if (type is not HomeGameDataFormat.None)
-            return HOME.GetEntity(pk).ConvertToPKM(type);
+        {
+            var pkh = HOME.GetEntity(pk);
+            var converted = pkh.ConvertToPKM(type);
+            if (converted is null)
+                result = IncompatibleSpecies;
+            return converted;
+        }
 
         result = NoTransferRoute;
         return null;

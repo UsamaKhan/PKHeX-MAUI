@@ -429,6 +429,10 @@ public static class FormConverter
                 types[0],
                 forms[Lord],
             },
+            Ursaluna when generation >= 9 => new[] {
+                types[0],
+                forms[Bloodmoon],
+            },
             Enamorus => new[] {
                 forms[641], // Incarnate
                 forms[952], // Therian
@@ -485,6 +489,24 @@ public static class FormConverter
                 forms[Drive],
                 forms[Aquatic],
                 forms[Glide],
+            },
+            Ogerpon => new[] {
+                forms[MaskTeal],
+                forms[MaskWellspring],
+                forms[MaskHearthflame],
+                forms[MaskCornerstone],
+                $"*{forms[MaskTeal]}",
+                $"*{forms[MaskWellspring]}",
+                $"*{forms[MaskHearthflame]}",
+                $"*{forms[MaskCornerstone]}",
+            },
+            Poltchageist => new[] {
+                forms[Counterfeit],
+                forms[Artisan],
+            },
+            Sinistcha => new[] {
+                forms[Unremarkable],
+                forms[Masterpiece],
             },
             _ => EMPTY,
         };
@@ -702,7 +724,7 @@ public static class FormConverter
             "P", "Q", "R", "S", "T",
             "U", "V", "W", "X", "Y",
             "Z",
-            // "!", "?", not in Gen II
+            // "!", "?", not in Gen2
         },
         _ => new[]
         {
@@ -873,36 +895,42 @@ public static class FormConverter
     private const int PaldeanCombat = 1123;
     private const int PaldeanBlaze = 1124;
     private const int PaldeanAqua = 1125;
+    internal const int MaskTeal = 1126;
+    private const int Counterfeit = 1127;
+    private const int Unremarkable = 1128;
+    private const int Bloodmoon = 1129;
+    internal const int MaskWellspring = 1130;
+    internal const int MaskHearthflame = 1131;
+    internal const int MaskCornerstone = 1132;
+    private const int Artisan = 1133;
+    private const int Masterpiece = 1134;
 
     public static string GetGigantamaxName(IReadOnlyList<string> forms) => forms[Gigantamax];
 
     public static string[] GetAlcremieFormList(IReadOnlyList<string> forms)
     {
-        var result = new string[63];
-        // seed form0 with the pattern
-        result[0 * 7] = forms[(int)Alcremie]; // Vanilla Cream
-        result[1 * 7] = forms[RubyCream];
-        result[2 * 7] = forms[MatchaCream];
-        result[3 * 7] = forms[MintCream];
-        result[4 * 7] = forms[LemonCream];
-        result[5 * 7] = forms[SaltedCream];
-        result[6 * 7] = forms[RubySwirl];
-        result[7 * 7] = forms[CaramelSwirl];
-        result[8 * 7] = forms[RainbowSwirl];
-
         const int deco = 7;
         const byte fc = 9;
-        for (byte f = 0; f < fc; f++)
-        {
-            int start = f * deco;
-            // iterate downwards using form0 as pattern ref, replacing on final loop
-            for (int i = deco - 1; i >= 0; i--)
-            {
-                result[start + i] = $"{result[start]} ({(AlcremieDecoration)i})";
-            }
-        }
+        var result = new string[deco * fc]; // 63
+        SetDecorations(result, 0, forms[(int)Alcremie]); // Vanilla Cream
+        SetDecorations(result, 1, forms[RubyCream]);
+        SetDecorations(result, 2, forms[MatchaCream]);
+        SetDecorations(result, 3, forms[MintCream]);
+        SetDecorations(result, 4, forms[LemonCream]);
+        SetDecorations(result, 5, forms[SaltedCream]);
+        SetDecorations(result, 6, forms[RubySwirl]);
+        SetDecorations(result, 7, forms[CaramelSwirl]);
+        SetDecorations(result, 8, forms[RainbowSwirl]);
 
         return result;
+
+        static void SetDecorations(string[] result, int f, string baseName)
+        {
+            int start = f * deco;
+            var slice = result.AsSpan(start, deco);
+            for (int i = 0; i < slice.Length; i++)
+                slice[i] = $"{baseName} ({(AlcremieDecoration)i})";
+        }
     }
 
     public static bool GetFormArgumentIsNamedIndex(ushort species) => species == (int)Alcremie;

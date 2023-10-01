@@ -6,7 +6,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 6 Mystery Gift Template File
 /// </summary>
-public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature, IMemoryOT
+public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature, IMemoryOT, IRestrictVersion
 {
     public const int Size = 0x108;
     public const uint EonTicketConst = 0x225D73C2;
@@ -376,12 +376,12 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         }
         else
         {
-            pk.SetDefaultRegionOrigins();
+            pk.SetDefaultRegionOrigins(pk.Language);
         }
 
         pk.SetMaximumPPCurrent();
 
-        pk.MetDate = Date ?? DateOnly.FromDateTime(DateTime.Now);
+        pk.MetDate = Date ?? EncounterDate.GetDate3DS();
 
         if ((tr.Generation > Generation && OriginGame == 0) || !CanBeReceivedByVersion(pk.Version))
         {
@@ -422,7 +422,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PK6 pk)
     {
         pk.IsEgg = true;
         pk.EggMetDate = Date;
@@ -430,9 +430,9 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK6 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.AO.GetFormEntry(Species, Form);
+        var pi = pk.PersonalInfo;
         pk.Nature = (int)criteria.GetNature((Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
@@ -457,7 +457,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         _ => AbilityPermission.Any12H,
     };
 
-    private void SetPID(PKM pk)
+    private void SetPID(PK6 pk)
     {
         switch (PIDType)
         {
@@ -490,7 +490,7 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         value[5] = IV_SPD;
     }
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PK6 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -606,7 +606,12 @@ public sealed class WC6 : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         if (RestrictLanguage != 0 && RestrictLanguage != pk.Language)
             return true;
         if (!CanBeReceivedByVersion(pk.Version))
-            return true;
+        {
+            if (!IsEgg || pk.IsEgg)
+                return true;
+            if (pk.Egg_Location != Locations.LinkTrade6)
+                return true;
+        }
         return false;
     }
 }

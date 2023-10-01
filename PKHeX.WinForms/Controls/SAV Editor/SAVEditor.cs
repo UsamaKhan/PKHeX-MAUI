@@ -558,7 +558,9 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         if (SAV is SAV9SV sv)
         {
             if (sender == B_Raids)
-                OpenDialog(new SAV_Raid9(sv, sv.Raid));
+                OpenDialog(new SAV_Raid9(sv, sv.RaidPaldea));
+            else if (sender == B_RaidKitakami)
+                OpenDialog(new SAV_Raid9(sv, sv.RaidKitakami));
             else if (sender == B_RaidsSevenStar)
                 OpenDialog(new SAV_RaidSevenStar9(sv, sv.RaidSevenStar));
         }
@@ -653,7 +655,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
             SAV8SWSH swsh => new SAV_PokedexSWSH(swsh),
             SAV8BS bs => new SAV_PokedexBDSP(bs),
             SAV8LA la => new SAV_PokedexLA(la),
-            SAV9SV swsh => new SAV_PokedexSV(swsh),
+            SAV9SV sv => sv.SaveRevision == 0 ? new SAV_PokedexSV(sv) : new SAV_PokedexSVKitakami(sv),
             _ => (Form?)null,
         };
         form?.ShowDialog();
@@ -1009,13 +1011,12 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
 
                 var grid = Box.BoxPokeGrid;
                 var height = grid.Height + grid.Location.Y + Box.Location.Y; // needed height
-                var required = height + 16;
                 var allowed = Tab_Box.Height;
-                if (required > allowed)
+                if (height > allowed)
                 {
                     var form = FindForm();
                     if (form != null)
-                        form.Height += required - allowed;
+                        form.Height += height - allowed;
                 }
             }
         }
@@ -1140,6 +1141,7 @@ public partial class SAVEditor : UserControl, ISlotViewer<PictureBox>, ISaveFile
         B_RaidsSevenStar.Visible = sav is SAV9SV;
         B_RaidArmor.Visible = sav is SAV8SWSH { SaveRevision: >= 1 };
         B_RaidCrown.Visible = sav is SAV8SWSH { SaveRevision: >= 2 };
+        B_RaidKitakami.Visible = sav is SAV9SV { SaveRevision: >= 1 };
         FLP_SAVtools.Visible = B_Blocks.Visible = true;
 
         var list = FLP_SAVtools.Controls.OfType<Control>().OrderBy(z => z.Text).ToArray();

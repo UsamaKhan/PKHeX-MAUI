@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PKHeX.Core;
 
@@ -7,7 +8,7 @@ public abstract class G4PKM : PKM,
     IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetUnique3, IRibbonSetUnique4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetRibbons, IContestStats, IGroundTile
 {
     protected G4PKM(byte[] data) : base(data) { }
-    protected G4PKM(int size) : base(size) { }
+    protected G4PKM([ConstantExpected] int size) : base(size) { }
 
     // Maximums
     public sealed override ushort MaxMoveID => Legal.MaxMoveID_4;
@@ -17,7 +18,7 @@ public abstract class G4PKM : PKM,
     public sealed override int MaxBallID => Legal.MaxBallID_4;
     public sealed override int MaxGameID => Legal.MaxGameID_4;
     public sealed override int MaxIV => 31;
-    public sealed override int MaxEV => 255;
+    public sealed override int MaxEV => EffortValues.Max255;
     public sealed override int MaxStringLengthOT => 7;
     public sealed override int MaxStringLengthNickname => 10;
 
@@ -33,7 +34,7 @@ public abstract class G4PKM : PKM,
     public sealed override void RefreshChecksum() => Checksum = CalculateChecksum();
     public sealed override bool ChecksumValid => CalculateChecksum() == Checksum;
     public override bool Valid { get => Sanity == 0 && ChecksumValid; set { if (!value) return; Sanity = 0; RefreshChecksum(); } }
-    protected virtual ushort CalculateChecksum() => PokeCrypto.GetCHK(Data.AsSpan()[8..PokeCrypto.SIZE_4STORED]);
+    protected virtual ushort CalculateChecksum() => Checksums.Add16(Data.AsSpan()[8..PokeCrypto.SIZE_4STORED]);
 
     // Trash Bytes
     public sealed override Span<byte> Nickname_Trash => Data.AsSpan(0x48, 22);

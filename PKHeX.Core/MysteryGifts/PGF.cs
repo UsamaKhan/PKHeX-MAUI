@@ -6,7 +6,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 5 Mystery Gift Template File
 /// </summary>
-public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature
+public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, ILangNick, IContestStats, INature, IRestrictVersion
 {
     public const int Size = 0xCC;
     public const int SizeFull = 0x2D0;
@@ -185,7 +185,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
 
         var rnd = Util.Rand;
 
-        var dt = DateTime.Now;
+        var dt = EncounterDate.GetDateNDS();
         if (Day == 0)
         {
             Day = (byte)dt.Day;
@@ -202,7 +202,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             Met_Level = currentLevel,
             Nature = Nature != -1 ? Nature : rnd.Next(25),
             Form = Form,
-            Version = OriginGame == 0 ? tr.Game : OriginGame,
+            Version = GetVersion(tr, rnd),
             Language = Language == 0 ? tr.Language : Language,
             Ball = Ball,
             Move1 = Move1,
@@ -241,8 +241,6 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
 
             FatefulEncounter = true,
         };
-        if (tr.Generation > 5 && OriginGame == 0) // Gen6+, give random gen5 game
-            pk.Version = (int)GameVersion.W + rnd.Next(4);
 
         if (Move1 == 0) // No moves defined
         {
@@ -251,8 +249,10 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
             source.SetEncounterMoves(Species, Form, Level, moves);
             pk.SetMoves(moves);
         }
-
-        pk.SetMaximumPPCurrent();
+        else
+        {
+            pk.SetMaximumPPCurrent();
+        }
 
         if (IsEgg) // User's
         {
@@ -283,6 +283,23 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return pk;
     }
 
+    private int GetVersion(ITrainerInfo tr, Random rnd)
+    {
+        if (OriginGame != 0)
+            return OriginGame;
+        if (tr.Generation <= 5)
+            return tr.Game;
+        // Gen6+, give random gen5 game
+        var bias = rnd.Next(4);
+        for (int i = 0; i < 4; i++)
+        {
+            var ver = (int)GameVersion.W + ((bias + i) % 4);
+            if (CanBeReceivedByVersion(ver))
+                return ver;
+        }
+        return (int)GameVersion.W; // should never hit this for any distributed card
+    }
+
     private void SetEggMetDetails(PK5 pk)
     {
         pk.IsEgg = true;
@@ -295,7 +312,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
     {
         var pi = PersonalTable.B2W2.GetFormEntry(Species, Form);
         pk.Nature = (int)criteria.GetNature((Nature)Nature);
-        pk.Gender = pi.Genderless ? 2 : Gender != 2 ? Gender : criteria.GetGender(-1, pi);
+        pk.Gender = pi.Genderless ? 2 : Gender != 2 ? Gender : criteria.GetGender(pi);
         var av = GetAbilityIndex(criteria);
         SetPID(pk, av);
         pk.RefreshAbility(av);
@@ -414,7 +431,7 @@ public sealed class PGF : DataMysteryGift, IRibbonSetEvent3, IRibbonSetEvent4, I
         return true;
     }
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => !CanBeReceivedByVersion(pk.Version);
 
     public bool CanBeReceivedByVersion(int game) => OriginGame == 0 || OriginGame == game;

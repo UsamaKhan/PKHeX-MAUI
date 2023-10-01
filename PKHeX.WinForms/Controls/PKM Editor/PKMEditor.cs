@@ -297,9 +297,10 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         if (focus)
             Hidden_Main.Focus();
 
+        var input = pk;
         if (!skipConversionCheck && !EntityConverter.TryMakePKMCompatible(pk, Entity, out var c, out pk))
         {
-            var msg = c.GetDisplayString(pk, Entity.GetType());
+            var msg = c.GetDisplayString(input, Entity.GetType());
             WinFormsUtil.Alert(msg);
             return;
         }
@@ -764,7 +765,12 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         }
 
         Entity.SetMoves(moves);
-        Entity.HealPP();
+        if (Entity is ITechRecord tr)
+        {
+            tr.ClearRecordFlags();
+            var la = new LegalityAnalysis(Entity);
+            tr.SetRecordFlags(moves, la.Info.EvoChainsAllGens.Get(Entity.Context));
+        }
         FieldsLoaded = false;
         LoadMoves(Entity);
         ClickPP(this, EventArgs.Empty);
@@ -832,6 +838,8 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         int minlvl = EncounterSuggestion.GetLowestLevel(Entity, encounter.LevelMin);
         if (minlvl == 0)
             minlvl = level;
+        if (Entity.Format < 3 && encounter.Encounter is { } x && !x.Version.Contains(GameVersion.C))
+            location = 0;
 
         if (Entity.CurrentLevel >= minlvl && Entity.Met_Level == level && Entity.Met_Location == location)
         {
@@ -843,7 +851,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
 
         if (!silent)
         {
-            var suggestions = EntitySuggestionUtil.GetMetLocationSuggestionMessage(Entity, level, location, minlvl);
+            var suggestions = EntitySuggestionUtil.GetMetLocationSuggestionMessage(Entity, level, location, minlvl, encounter.Encounter);
             if (suggestions.Count <= 1) // no suggestion
                 return false;
 
@@ -863,6 +871,21 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
 
             if (Entity is { Gen6: true, WasEgg: true } && ModifyPKM)
                 Entity.SetHatchMemory6();
+        }
+        else
+        {
+            Entity.Met_Location = location;
+            TB_MetLevel.Text = encounter.GetSuggestedMetLevel(Entity).ToString();
+            CB_MetLocation.SelectedValue = location;
+            var timeIndex = 0;
+            if (encounter.Encounter is { } enc && location is < 253 and not 0)
+            {
+                if (enc is EncounterSlot2 s2)
+                    timeIndex = s2.GetRandomTime();
+                else
+                    timeIndex = Util.Rand.Next(1, 4);
+            }
+            CB_MetTimeOfDay.SelectedIndex = timeIndex;
         }
 
         if (Entity.CurrentLevel < minlvl)
@@ -1038,7 +1061,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
 
         if (FieldsLoaded)
             FA_Form.SaveArgument(f);
-        L_FormArgument.Visible = FA_Form.LoadArgument(f, Entity.Species, Entity.Form, Entity.Format);
+        L_FormArgument.Visible = FA_Form.LoadArgument(f, Entity.Species, Entity.Form, Entity.Context);
     }
 
     private void UpdatePKRSstrain(object sender, EventArgs e)
@@ -1187,7 +1210,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         {
             CheckMetLocationChange(version, Entity.Context);
             if (FieldsLoaded)
-                Entity.Version = (int)version;
+                Entity.Version = (byte)version;
         }
 
         // Visibility logic for Gen 4 ground tile; only show for Gen 4 Pokemon.
@@ -1728,12 +1751,10 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
 
     private void ValidateMovePaint(object? sender, DrawItemEventArgs e)
     {
-        if (sender is null || e.Index < 0)
+        if (sender is not ComboBox cb || e.Index < 0 || cb.Items[e.Index] is not ComboItem item)
             return;
 
-        var cb = (ComboBox)sender;
-        var item = cb.Items[e.Index];
-        var (text, value) = (ComboItem)item;
+        var (text, value) = item;
         var valid = LegalMoveSource.Info.CanLearn((ushort)value) && !HaX;
 
         var current = (e.State & DrawItemState.Selected) != 0;
@@ -1849,7 +1870,8 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         {
             Span<ushort> moves = stackalloc ushort[4];
             Entity.GetMoves(moves);
-            t.SetRecordFlags(moves);
+            var la = new LegalityAnalysis(Entity);
+            t.SetRecordFlags(moves, la.Info.EvoChainsAllGens.Get(Entity.Context));
             UpdateLegality();
             return;
         }
@@ -2169,7 +2191,7 @@ public sealed partial class PKMEditor : UserControl, IMainEditor
         // Set the Move ComboBoxes too..
         LegalMoveSource.ChangeMoveSource(source.Moves);
         foreach (var cb in Relearn)
-            SetIfDifferentCount(source.Moves, cb, force);
+            SetIfDifferentCount(source.Relearn, cb, force);
         foreach (var cb in Moves)
             SetIfDifferentCount(source.Moves, cb.CB_Move, force);
         if (sav is SAV8LA)

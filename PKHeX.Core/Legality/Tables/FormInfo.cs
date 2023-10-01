@@ -31,6 +31,7 @@ public static class FormInfo
             case (int)Necrozma when form < 3: // Only mark Ultra Necrozma as Battle Only
                 return false;
             case (int)Minior: return form < 7; // Minior Shields-Down
+            case (int)Ogerpon: return form >= 4; // Embody Aspect
 
             default:
                 return form != 0;
@@ -50,6 +51,7 @@ public static class FormInfo
         (int)Darmanitan => (byte)(form & 2),
         (int)Zygarde when format > 6 => 3,
         (int)Minior => (byte)(form + 7),
+        (int)Ogerpon => (byte)(form & 3),
         _ => 0,
     };
 
@@ -110,12 +112,10 @@ public static class FormInfo
         }
         if (species is (int)Deerling or (int)Sawsbuck)
         {
-            return origin switch
-            {
-                EntityContext.Gen5 => true,
-                EntityContext.Gen9 => true,
-                _ => false, // todo home sv
-            };
+            if (origin == EntityContext.Gen5)
+                return true; // B/W
+            if (current.Generation() >= 8)
+                return true; // Via S/V
         }
         return false;
     }
@@ -159,6 +159,7 @@ public static class FormInfo
         (int)Necrozma,
         (int)Calyrex,
         (int)Enamorus,
+        (int)Ogerpon,
     };
 
     /// <summary>
@@ -187,6 +188,7 @@ public static class FormInfo
         (int)Eternatus,
 
         (int)Palafin,
+        (int)Ogerpon,
     };
 
     /// <summary>

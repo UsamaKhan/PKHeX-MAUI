@@ -81,9 +81,9 @@ public sealed class PK1 : GBPKML, IPersonalType
 
     public static bool IsCatchRateHeldItem(byte rate) => rate == 0 || Array.IndexOf(Legal.HeldItems_GSC, rate) >= 0;
 
-    private static bool IsCatchRatePreEvolutionRate(ushort baseSpecies, int finalSpecies, byte rate)
+    private static bool IsCatchRatePreEvolutionRate(int baseSpecies, int finalSpecies, byte rate)
     {
-        for (ushort species = baseSpecies; species <= finalSpecies; species++)
+        for (int species = baseSpecies; species <= finalSpecies; species++)
         {
             if (rate == PersonalTable.RB[species].CatchRate || rate == PersonalTable.Y[species].CatchRate)
                 return true;
@@ -118,9 +118,12 @@ public sealed class PK1 : GBPKML, IPersonalType
         if (species == (int)Core.Species.Pikachu && rate == 0xA3) // Light Ball (starter)
             return true;
 
-        var table = EvolutionTree.Evolves1;
-        var baby = table.GetBaseSpeciesForm(species, 0);
-        return IsCatchRatePreEvolutionRate(baby.Species, species, rate);
+        // Get de-evolution steps we should check for.
+        var stage = PersonalInfo1.GetEvolutionStage(species);
+        // For Eevee-lutions, Eevee evolves to (134,135,136), which are (1,1,1). All 3 have the same catch rate as Eevee.
+        // In the event the current species is 135 or 136, we'd never check Eevee with this logic, but they're all 45.
+        var baby = species - stage;
+        return IsCatchRatePreEvolutionRate(baby, species, rate);
     }
 
     public override int Version { get => (int)GameVersion.RBY; set { } }
@@ -161,6 +164,9 @@ public sealed class PK1 : GBPKML, IPersonalType
     public PK7 ConvertToPK7()
     {
         var rnd = Util.Rand;
+        var lang = TransferLanguage(RecentTrainerCache.Language);
+        var pi = PersonalTable.SM[Species];
+        int abil = TransporterLogic.IsHiddenDisallowedVC1(Species) ? 0 : 2; // Hidden
         var pk7 = new PK7
         {
             EncryptionConstant = rnd.Rand32(),
@@ -172,7 +178,7 @@ public sealed class PK1 : GBPKML, IPersonalType
             Nature = Experience.GetNatureVC(EXP),
             PID = rnd.Rand32(),
             Ball = 4,
-            MetDate = DateOnly.FromDateTime(DateTime.Now),
+            MetDate = EncounterDate.GetDate3DS(),
             Version = (int)GameVersion.RD, // Default to red
             Move1 = Move1,
             Move2 = Move2,
@@ -189,41 +195,24 @@ public sealed class PK1 : GBPKML, IPersonalType
             CurrentHandler = 1,
             HT_Name = RecentTrainerCache.OT_Name,
             HT_Gender = RecentTrainerCache.OT_Gender,
+
+            Language = lang,
+            Nickname = SpeciesName.GetSpeciesNameGeneration(Species, lang, 7),
+            OT_Name = GetTransferTrainerName(lang),
+            OT_Friendship = pi.BaseFriendship,
+            HT_Friendship = pi.BaseFriendship,
+
+            Ability = pi.GetAbilityAtIndex(abil),
+            AbilityNumber = 1 << abil,
         };
-        RecentTrainerCache.SetConsoleRegionData3DS(pk7);
-        RecentTrainerCache.SetFirstCountryRegion(pk7);
-        pk7.HealPP();
-        var lang = TransferLanguage(RecentTrainerCache.Language);
-        pk7.Language = lang;
-        pk7.Nickname = SpeciesName.GetSpeciesNameGeneration(pk7.Species, lang, pk7.Format);
-        pk7.OT_Name = OT_Trash[0] != StringConverter12.G1TradeOTCode ? StringConverter12Transporter.GetString(OT_Trash, Japanese) : StringConverter12.G1TradeOTName[lang]; // In-game Trade
-        pk7.OT_Friendship = pk7.HT_Friendship = PersonalTable.SM[Species].BaseFriendship;
 
-        // IVs
-        Span<int> finalIVs = stackalloc int[6];
-        int flawless = Species == (int)Core.Species.Mew ? 5 : 3;
-        for (var i = 0; i < finalIVs.Length; i++)
-            finalIVs[i] = rnd.Next(32);
-        for (var i = 0; i < flawless; i++)
-            finalIVs[i] = 31;
-        rnd.Shuffle(finalIVs);
-        pk7.SetIVs(finalIVs);
+        bool special = Species == (int)Core.Species.Mew;
+        int flawless = special ? 5 : 3;
+        pk7.SetTransferIVs(flawless, rnd);
+        pk7.SetTransferPID(IsShiny);
+        pk7.SetTransferLocale(lang);
 
-        switch (IsShiny ? Shiny.Always : Shiny.Never)
-        {
-            case Shiny.Always when !pk7.IsShiny: // Force Square
-                var low = pk7.PID & 0xFFFF;
-                pk7.PID = (low ^ pk7.TID16 ^ 0u) << 16 | low;
-                break;
-            case Shiny.Never when pk7.IsShiny: // Force Not Shiny
-                pk7.PID ^= 0x1000_0000;
-                break;
-        }
-
-        int abil = TransporterLogic.IsHiddenDisallowedVC1(Species) ? 0 : 2; // Hidden
-        pk7.RefreshAbility(abil); // 0/1/2 (not 1/2/4)
-
-        if (Species == (int)Core.Species.Mew) // Mew gets special treatment.
+        if (special) // Mew gets special treatment.
         {
             pk7.FatefulEncounter = true;
         }
@@ -233,9 +222,15 @@ public sealed class PK1 : GBPKML, IPersonalType
             pk7.Nickname = StringConverter12Transporter.GetString(Nickname_Trash, Japanese);
         }
 
-        pk7.SetTradeMemoryHT6(bank:true); // oh no, memories on gen7 pk
-
+        pk7.HealPP();
         pk7.RefreshChecksum();
         return pk7;
+    }
+
+    private string GetTransferTrainerName(int lang)
+    {
+        if (OT_Trash[0] == StringConverter12.G1TradeOTCode) // In-game Trade
+            return StringConverter12.G1TradeOTName[lang];
+        return StringConverter12Transporter.GetString(OT_Trash, Japanese);
     }
 }

@@ -491,7 +491,7 @@ public sealed class WA8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
             pk.SID16 = tr.SID16;
         }
 
-        pk.MetDate = IsDateRestricted && EncounterServerDate.WA8Gifts.TryGetValue(CardID, out var dt) ? dt.Start : DateOnly.FromDateTime(DateTime.Now);
+        pk.MetDate = IsDateRestricted && EncounterServerDate.WA8Gifts.TryGetValue(CardID, out var dt) ? dt.Start : EncounterDate.GetDateSwitch();
 
         // HOME Gifts for Sinnoh/Hisui starters were forced JPN until May 20, 2022 (UTC).
         if (CardID is 9018 or 9019 or 9020)
@@ -526,19 +526,18 @@ public sealed class WA8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PA8 pk)
     {
         pk.IsEgg = true;
-        pk.EggMetDate = DateOnly.FromDateTime(DateTime.Now);
+        pk.EggMetDate = EncounterDate.GetDateSwitch();
         pk.Nickname = SpeciesName.GetEggName(pk.Language, Generation);
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PA8 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.LA.GetFormEntry(Species, Form);
-        pk.Nature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
-        pk.StatNature = pk.Nature;
+        var pi = pk.PersonalInfo;
+        pk.Nature = pk.StatNature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
         pk.RefreshAbility(av);
@@ -661,24 +660,7 @@ public sealed class WA8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         if (Form != evo.Form && !FormInfo.IsFormChangeable(Species, Form, pk.Form, Context, pk.Context))
             return false;
 
-        if (IsEgg)
-        {
-            if (EggLocation != pk.Egg_Location) // traded
-            {
-                if (pk.Egg_Location != Locations.LinkTrade6)
-                    return false;
-                if (PIDType == ShinyType8.Random && pk is { IsShiny: true, ShinyXor: > 1 })
-                    return false; // shiny traded egg will always have xor0/1.
-            }
-            if (!Shiny.IsValid(pk))
-            {
-                return false; // can't be traded away for unshiny
-            }
-
-            if (pk is { IsEgg: true, IsNative: false })
-                return false;
-        }
-        else
+        // Never Egg
         {
             if (!Shiny.IsValid(pk)) return false;
             if (!IsMatchEggLocation(pk)) return false;
@@ -723,7 +705,7 @@ public sealed class WA8 : DataMysteryGift, ILangNick, INature, IGigantamax, IDyn
         return pk.PID == GetPID(pk, type);
     }
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => false; // no version compatibility checks yet.
 
     #region Lazy Ribbon Implementation

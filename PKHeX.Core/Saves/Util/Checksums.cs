@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -101,11 +103,11 @@ public static class Checksums
     /// <param name="data">Input byte array</param>
     /// <param name="initial">Initial value for checksum</param>
     /// <returns>Checksum</returns>
-    private static ushort CRC16(ReadOnlySpan<byte> data, ushort initial)
+    private static ushort CRC16(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] ushort initial)
     {
         ushort chk = initial;
         foreach (var b in data)
-            chk = (ushort)(crc16[(b ^ chk) & 0xFF] ^ (chk >> 8));
+            chk = (ushort)(crc16[(byte)(b ^ chk)] ^ (chk >> 8));
         return chk;
     }
 
@@ -121,19 +123,24 @@ public static class Checksums
     /// <param name="data">Input byte array</param>
     /// <param name="initial">Initial value for checksum</param>
     /// <returns>Checksum</returns>
-    public static ushort CheckSum32(ReadOnlySpan<byte> data, uint initial = 0)
+    public static ushort CheckSum32(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] uint initial = 0)
     {
-        uint val = initial;
-        for (int i = 0; i < data.Length; i += 4)
-            val += ReadUInt32LittleEndian(data[i..]);
-        return (ushort)(val + (val >> 16));
+        uint chk = initial;
+        foreach (var u32 in MemoryMarshal.Cast<byte, uint>(data))
+        {
+            if (BitConverter.IsLittleEndian)
+                chk += u32;
+            else
+                chk += ReverseEndianness(u32);
+        }
+        return (ushort)(chk + (chk >> 16));
     }
 
     /// <summary>Calculates the 32bit checksum over an input byte array.</summary>
     /// <param name="data">Input byte array</param>
     /// <param name="initial">Initial value for checksum</param>
     /// <returns>Checksum</returns>
-    private static uint CRC32(ReadOnlySpan<byte> data, uint initial)
+    private static uint CRC32(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] uint initial)
     {
         uint chk = initial;
         foreach (var b in data)
@@ -153,7 +160,7 @@ public static class Checksums
     /// <param name="data">Input byte array</param>
     /// <param name="initial">Initial value for checksum</param>
     /// <returns>Checksum</returns>
-    public static ushort CheckSum16(ReadOnlySpan<byte> data, ushort initial = 0)
+    public static ushort CheckSum16(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] ushort initial = 0)
     {
         ushort acc = initial;
         foreach (byte b in data)
@@ -166,13 +173,43 @@ public static class Checksums
     /// <returns>Checksum</returns>
     public static uint CheckSum16BigInvert(ReadOnlySpan<byte> data)
     {
-        if ((data.Length & 1) != 0)
-            data = data[..^2];
-
-        ushort chk = 0; // initial value
-        for (int i = 0; i < data.Length; i += 2)
-            chk += ReadUInt16BigEndian(data[i..]);
-
+        var chk = Add16BigEndian(data);
         return (uint)((chk << 16) | (ushort)(0xF004u - chk));
+    }
+
+    /// <summary>
+    /// Gets the 16-bit checksum of a byte array reading as Little Endian.
+    /// </summary>
+    /// <param name="data">Input byte array</param>
+    /// <returns>Checksum</returns>
+    public static ushort Add16(ReadOnlySpan<byte> data)
+    {
+        ushort chk = 0;
+        foreach (var u16 in MemoryMarshal.Cast<byte, ushort>(data))
+        {
+            if (BitConverter.IsLittleEndian)
+                chk += u16;
+            else
+                chk += ReverseEndianness(u16);
+        }
+        return chk;
+    }
+
+    /// <summary>
+    /// Gets the 16-bit checksum of a byte array reading as Big Endian.
+    /// </summary>
+    /// <param name="data">Input byte array</param>
+    /// <returns>Checksum</returns>
+    public static ushort Add16BigEndian(ReadOnlySpan<byte> data)
+    {
+        ushort chk = 0;
+        foreach (var u16 in MemoryMarshal.Cast<byte, ushort>(data))
+        {
+            if (!BitConverter.IsLittleEndian)
+                chk += u16;
+            else
+                chk += ReverseEndianness(u16);
+        }
+        return chk;
     }
 }

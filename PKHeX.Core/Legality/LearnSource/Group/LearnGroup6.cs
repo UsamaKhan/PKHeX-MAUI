@@ -9,6 +9,7 @@ public sealed class LearnGroup6 : ILearnGroup
 {
     public static readonly LearnGroup6 Instance = new();
     private const int Generation = 6;
+    public ushort MaxMoveID => Legal.MaxMoveID_6_AO;
 
     public ILearnGroup? GetPrevious(PKM pk, EvolutionHistory history, IEncounterTemplate enc, LearnOption option) => enc.Generation is Generation ? null : LearnGroup5.Instance;
     public bool HasVisited(PKM pk, EvolutionHistory history) => history.HasVisitedGen6;
@@ -21,8 +22,13 @@ public sealed class LearnGroup6 : ILearnGroup
         for (var i = 0; i < evos.Length; i++)
             Check(result, current, pk, evos[i], i, types, option, mode);
 
-        if (option is not LearnOption.Current && types.HasFlag(MoveSourceType.Encounter) && enc is EncounterEgg { Generation: Generation } egg)
-            CheckEncounterMoves(result, current, egg);
+        if (option.IsPast() && types.HasFlag(MoveSourceType.Encounter))
+        {
+            if (enc is EncounterEgg { Generation: Generation } egg)
+                CheckEncounterMoves(result, current, egg);
+            else if (enc is EncounterSlot6AO { CanDexNav: true } dexnav && pk.IsOriginalMovesetDeleted())
+                CheckDexNavMoves(result, current, dexnav);
+        }
 
         return MoveResult.AllParsed(result);
     }
@@ -47,6 +53,22 @@ public sealed class LearnGroup6 : ILearnGroup
         }
     }
 
+    private static void CheckDexNavMoves(Span<MoveResult> result, ReadOnlySpan<ushort> current, EncounterSlot6AO dexnav)
+    {
+        // DexNav moves are only available in OR/AS
+        // Can only have one DexNav move
+        for (var i = 0; i < result.Length; i++)
+        {
+            if (result[i].Valid)
+                continue;
+            var move = current[i];
+            if (!dexnav.CanBeDexNavMove(move))
+                continue;
+            result[i] = new(new(LearnMethod.Special, LearnEnvironment.ORAS), Generation);
+            break;
+        }
+    }
+
     private static void Check(Span<MoveResult> result, ReadOnlySpan<ushort> current, PKM pk, EvoCriteria evo, int stage, MoveSourceType types, LearnOption option, CheckMode mode)
     {
         if (!FormChangeUtil.ShouldIterateForms(evo.Species, evo.Form, Generation, option))
@@ -65,10 +87,10 @@ public sealed class LearnGroup6 : ILearnGroup
             CheckInternal(result, current, pk, evo with { Form = (byte)i }, stage, types, option, mode);
     }
 
-    private static CheckMode GetCheckMode(IGeneration enc, PKM pk)
+    private static CheckMode GetCheckMode(IEncounterTemplate enc, PKM pk)
     {
         // We can check if it has visited specific sources. We won't check the games it hasn't visited.
-        if (enc.Generation != Generation || !pk.IsUntraded)
+        if (enc.Context != EntityContext.Gen6 || !pk.IsUntraded)
             return CheckMode.Both;
         if (pk.AO)
             return CheckMode.AO;
@@ -196,14 +218,14 @@ public sealed class LearnGroup6 : ILearnGroup
 
     private static void FlagEncounterMoves(IEncounterTemplate enc, Span<bool> result)
     {
-        if (enc is IMoveset { Moves: { Move1: not 0 } x })
+        if (enc is IMoveset { Moves: { HasMoves: true } x })
         {
             result[x.Move4] = true;
             result[x.Move3] = true;
             result[x.Move2] = true;
             result[x.Move1] = true;
         }
-        if (enc is IRelearn { Relearn: {Move1: not 0} r})
+        if (enc is IRelearn { Relearn: { HasMoves: true } r})
         {
             result[r.Move4] = true;
             result[r.Move3] = true;

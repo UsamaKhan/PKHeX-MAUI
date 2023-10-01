@@ -108,10 +108,7 @@ public partial class SizeCP : UserControl
             var label = L_SizeH;
             var value = ss.HeightScalar;
             label.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(value)];
-            if (value is 255 && scale is PA8) // Alpha or (unlikely, user error?)
-                label.ForeColor = Color.Red;
-            else
-                label.ResetForeColor();
+            SetLabelColorHeightWeight(label);
         }
 
         if (!CHK_Auto.Checked || Loading || sv == null)
@@ -131,10 +128,7 @@ public partial class SizeCP : UserControl
             var label = L_SizeW;
             var value = ss.WeightScalar;
             label.Text = SizeClass[(int)PokeSizeUtil.GetSizeRating(value)];
-            if (value is 255 && scale is PA8) // Alpha or (unlikely, user error?)
-                label.ForeColor = Color.Red;
-            else
-                label.ResetForeColor();
+            SetLabelColorHeightWeight(label);
         }
 
         if (!CHK_Auto.Checked || Loading || sv == null)
@@ -162,6 +156,14 @@ public partial class SizeCP : UserControl
             else
                 label.ResetForeColor();
         }
+    }
+
+    private void SetLabelColorHeightWeight(Control label)
+    {
+        if (scale is not null)
+            label.ForeColor = Color.Gray; // not indicative of actual size
+        else
+            label.ResetForeColor();
     }
 
     private void TB_HeightAbs_TextChanged(object sender, EventArgs e)

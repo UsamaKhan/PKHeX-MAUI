@@ -3,7 +3,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Move IDs for the corresponding English move name.
 /// </summary>
-public enum Move
+public enum Move : ushort
 {
     None,
     Pound,
@@ -906,5 +906,9 @@ public enum Move
     NoxiousTorque,
     CombatTorque,
     MagicalTorque,
+    BloodMoon,
+    MatchaGotcha,
+    SyrupBomb,
+    IvyCudgel,
     MAX_COUNT,
 }

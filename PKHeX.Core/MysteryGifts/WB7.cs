@@ -6,7 +6,7 @@ namespace PKHeX.Core;
 /// <summary>
 /// Generation 7 Mystery Gift Template File (LGP/E)
 /// </summary>
-public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangNicknamedTemplate
+public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangNicknamedTemplate, IRestrictVersion
 {
     public const int Size = 0x108;
     public const int SizeFull = 0x310;
@@ -423,7 +423,7 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
             pk.SID16 = tr.SID16;
         }
 
-        pk.MetDate = Date ?? DateOnly.FromDateTime(DateTime.Now);
+        pk.MetDate = Date ?? EncounterDate.GetDateSwitch();
         pk.IsNicknamed = GetIsNicknamed(redeemLanguage);
         pk.Nickname = pk.IsNicknamed ? GetNickname(redeemLanguage) : SpeciesName.GetSpeciesNameGeneration(Species, pk.Language, Generation);
 
@@ -441,7 +441,7 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
         return pk;
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PB7 pk)
     {
         pk.IsEgg = true;
         pk.EggMetDate = Date;
@@ -449,9 +449,9 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PB7 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.GG.GetFormEntry(Species, Form);
+        var pi = pk.PersonalInfo;
         pk.Nature = (int)criteria.GetNature((Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
@@ -476,7 +476,7 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
         _ => AbilityPermission.Any12H,
     };
 
-    private void SetPID(PKM pk)
+    private void SetPID(PB7 pk)
     {
         switch (PIDType)
         {
@@ -497,7 +497,7 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
         }
     }
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PB7 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -605,6 +605,6 @@ public sealed class WB7 : DataMysteryGift, ILangNick, IAwakened, INature, ILangN
         return true;
     }
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk) => false;
 }

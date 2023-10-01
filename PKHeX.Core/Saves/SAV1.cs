@@ -17,6 +17,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     public string SaveRevisionString => (Japanese ? "J" : "U") + (IsVirtualConsole ? "VC" : "GB");
     public bool Japanese { get; }
     public bool Korean => false;
+    public override int Language => Japanese ? 1 : -1;
 
     public override PersonalTable1 Personal { get; }
 
@@ -226,7 +227,7 @@ public sealed class SAV1 : SaveFile, ILangDeviantSave, IEventFlagArray
     public override int MaxCoins => 9999;
 
     public override int BoxCount => Japanese ? 8 : 12;
-    public override int MaxEV => 65535;
+    public override int MaxEV => EffortValues.Max12;
     public override int MaxIV => 15;
     public override int Generation => 1;
     public override EntityContext Context => EntityContext.Gen1;

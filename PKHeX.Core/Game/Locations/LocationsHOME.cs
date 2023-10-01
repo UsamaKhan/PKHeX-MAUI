@@ -1,3 +1,5 @@
+using System;
+
 namespace PKHeX.Core;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace PKHeX.Core;
 public static class LocationsHOME
 {
     // 60000 - (version - PLA)
-    private const int RemapCount = 5;
+    private const int RemapCount = 5; // Count of future game version IDs that can transfer back into SW/SH.
     public const ushort SHVL = 59996; // VL traded to (SW)SH
     public const ushort SWSL = 59997; // SL traded to SW(SH)
     public const ushort SHSP = 59998; // SP traded to (SW)SH
@@ -85,6 +87,16 @@ public static class LocationsHOME
         _ => loc,
     };
 
+    public static int GetVersionSWSHOriginal(ushort loc) => loc switch
+    {
+        SWLA => (int)GameVersion.PLA,
+        SWBD => (int)GameVersion.BD,
+        SHSP => (int)GameVersion.SP,
+        SWSL => (int)GameVersion.SL,
+        SHVL => (int)GameVersion.VL,
+        _ => int.MinValue,
+    };
+
     /// <summary>
     /// Checks if the met location is a valid location for the input <see cref="ver"/>.
     /// </summary>
@@ -106,4 +118,47 @@ public static class LocationsHOME
         SWSL when ver == (int)GameVersion.SW => true,
         _ => false,
     };
+
+    /// <summary>
+    /// Checks if the location is (potentially) remapped based on visitation options.
+    /// </summary>
+    /// <remarks>Relevant when a side data yields SW/SH side data with a higher priority than the original (by version) side data.</remarks>
+    /// <param name="original">Original context</param>
+    /// <param name="current">Current context</param>
+    public static LocationRemapState GetRemapState(EntityContext original, EntityContext current)
+    {
+        if (current == original)
+            return LocationRemapState.Original;
+        if (current == EntityContext.Gen8)
+            return LocationRemapState.Remapped;
+        return original.Generation() switch
+        {
+            < 8 => LocationRemapState.Original,
+            8 => LocationRemapState.Either,
+            _ => current is (EntityContext.Gen8a or EntityContext.Gen8b) // down
+                ? LocationRemapState.Either
+                : LocationRemapState.Original,
+        };
+    }
+
+    public static bool IsMatchLocation(EntityContext original, EntityContext current, int met, int expect, int version)
+    {
+        var state = GetRemapState(original, current);
+        return state switch
+        {
+            LocationRemapState.Original => met == expect,
+            LocationRemapState.Remapped => met == GetMetSWSH((ushort)expect, version),
+            LocationRemapState.Either => met == expect || met == GetMetSWSH((ushort)expect, version),
+            _ => false,
+        };
+    }
+}
+
+[Flags]
+public enum LocationRemapState
+{
+    None,
+    Original = 1 << 0,
+    Remapped = 1 << 1,
+    Either = Original | Remapped,
 }

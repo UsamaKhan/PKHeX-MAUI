@@ -114,10 +114,20 @@ public static class Legal
   //internal const int MaxGameID_8b = (int)GameVersion.SP;
     internal const int MaxAbilityID_8b = MaxAbilityID_8_R2;
 
-    internal const int MaxSpeciesID_9 = (int)Species.IronLeaves;
-    internal const int MaxMoveID_9 = (int)Move.MagicalTorque;
-    internal const int MaxItemID_9 = 2400; // Yellow Dish
-    internal const int MaxAbilityID_9 = (int)Ability.MyceliumMight;
+    internal const int MaxSpeciesID_9 = MaxSpeciesID_9_T1;
+    internal const int MaxMoveID_9 = MaxMoveID_9_T1;
+    internal const int MaxItemID_9 = MaxItemID_9_T1;
+    internal const int MaxAbilityID_9 = MaxAbilityID_9_T1;
+
+    internal const int MaxSpeciesID_9_T0 = (int)Species.IronLeaves;
+    internal const int MaxMoveID_9_T0 = (int)Move.MagicalTorque;
+    internal const int MaxItemID_9_T0 = 2400; // Yellow Dish
+    internal const int MaxAbilityID_9_T0 = (int)Ability.MyceliumMight;
+
+    internal const int MaxSpeciesID_9_T1 = (int)Species.Ogerpon;
+    internal const int MaxMoveID_9_T1 = (int)Move.IvyCudgel;
+    internal const int MaxItemID_9_T1 = 2481; // Glimmering Charm
+    internal const int MaxAbilityID_9_T1 = (int)Ability.SupersweetSyrup;
 
     internal const int MaxBallID_9 = (int)Ball.LAOrigin;
     internal const int MaxGameID_9 = (int)GameVersion.VL;
@@ -138,20 +148,6 @@ public static class Legal
     internal static readonly ushort[] HeldItems_BS = ItemStorage8BDSP.GetAll();
     internal static readonly ushort[] HeldItems_LA = Array.Empty<ushort>();
     internal static readonly ushort[] HeldItems_SV = ItemStorage9SV.GetAllHeld();
-
-    internal static int GetMaxSpeciesOrigin(int generation) => generation switch
-    {
-        1 => MaxSpeciesID_1,
-        2 => MaxSpeciesID_2,
-        3 => MaxSpeciesID_3,
-        4 => MaxSpeciesID_4,
-        5 => MaxSpeciesID_5,
-        6 => MaxSpeciesID_6,
-        7 => MaxSpeciesID_7b,
-        8 => MaxSpeciesID_8a,
-        9 => MaxSpeciesID_9,
-        _ => -1,
-    };
 
     internal static int GetMaxLanguageID(int generation) => generation switch
     {
@@ -231,11 +227,12 @@ public static class Legal
     /// </summary>
     public static bool GetIsFixedIVSequenceValidSkipRand(ReadOnlySpan<int> IVs, PKM pk, uint max = 31)
     {
-        for (int i = 0; i < 6; i++)
+        for (int i = 5; i >= 0; i--)
         {
-            if ((uint) IVs[i] > max) // random
+            var iv = IVs[i];
+            if ((uint)iv > max) // random
                 continue;
-            if (IVs[i] != pk.GetIV(i))
+            if (iv != pk.GetIV(i))
                 return false;
         }
         return true;

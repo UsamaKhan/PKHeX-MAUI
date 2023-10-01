@@ -371,11 +371,11 @@ public partial class StatEditor : UserControl
         EVTip.SetToolTip(TB_EVTotal, $"Remaining: {510 - evtotal}");
     }
 
-    private Color GetEVTotalColor(int evtotal, Color defaultColor) => evtotal switch
+    private Color GetEVTotalColor(int evtotal, Color defaultColor) => EffortValues.GetGrade(evtotal) switch
     {
-        > 510 => EVsInvalid, // Background turns Red
-        510 => EVsMaxed, // Maximum EVs
-        508 => EVsFishy, // Fishy EVs
+        EffortValueGrade.Illegal => EVsInvalid, // Background turns Red
+        EffortValueGrade.MaxLegal => EVsMaxed, // Maximum EVs
+        EffortValueGrade.MaxEffective => EVsFishy, // Fishy EVs
         _ => defaultColor,
     };
 
@@ -427,7 +427,7 @@ public partial class StatEditor : UserControl
         else if (ModifierKeys == Keys.Alt)
             ivs.Clear();
         else
-            Entity.SetRandomIVs(ivs);
+            Entity.SetRandomIVs(ivs, new LegalityAnalysis(Entity).EncounterMatch is IFlawlessIVCount fc ? fc.FlawlessIVCount : 0);
 
         LoadIVs(ivs);
         if (Entity is IGanbaru g)
@@ -638,6 +638,8 @@ public partial class StatEditor : UserControl
         foreach (var mtb in MT_EVs)
             mtb.Visible = !showAV;
 
+        FLP_PKMEditors.PerformLayout();
+
         var showGV = pk is IGanbaru;
         Label_GVs.Visible = showGV;
         foreach (var mtb in MT_GVs)
@@ -659,6 +661,12 @@ public partial class StatEditor : UserControl
     private void L_TeraTypeOriginal_Click(object sender, EventArgs e)
     {
         var pi = Entity.PersonalInfo;
+        if (!Entity.SV)
+        {
+            var expect = TeraTypeUtil.GetTeraTypeImport(pi.Type1, pi.Type2);
+            SetOriginalTeraType((byte)expect);
+            return;
+        }
         var current = WinFormsUtil.GetIndex(CB_TeraTypeOriginal);
         var update = pi.Type1 == current ? pi.Type2 : pi.Type1;
         SetOriginalTeraType(update);
@@ -704,7 +712,7 @@ public partial class StatEditor : UserControl
             ((PKMEditor)MainEditor).UpdateSprite();
     }
 
-    private void L_TeraTypeOverride_Click(object sender, EventArgs e) => CB_TeraTypeOverride.SelectedValue = (int)TeraOverrideNoneValue;
+    private void L_TeraTypeOverride_Click(object sender, EventArgs e) => CB_TeraTypeOverride.SelectedValue = Entity.SV ? (int)TeraOverrideNoneValue : CB_TeraTypeOriginal.SelectedValue;
 
     private void ChangeTeraType(object sender, EventArgs e)
     {

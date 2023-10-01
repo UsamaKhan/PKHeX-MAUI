@@ -42,10 +42,11 @@ public partial class Main : Form
         startup.ReadArguments(args);
         startup.ReadSettings(Settings.Startup);
         startup.ReadTemplateIfNoEntity(TemplatePath);
-        FormLoadInitialFiles(startup);
 
         if (Settings.Startup.PluginLoadMethod != PluginLoadSetting.DontLoad)
             FormLoadPlugins();
+
+        FormLoadInitialFiles(startup);
 
         if (HaX)
         {
@@ -128,11 +129,12 @@ public partial class Main : Form
     {
         foreach (var x in args)
         {
-            if (string.Equals(x.Trim('-'), nameof(HaX), StringComparison.CurrentCultureIgnoreCase))
+            var arg = x.AsSpan().Trim('-');
+            if (arg.Equals(nameof(HaX), StringComparison.CurrentCultureIgnoreCase))
                 return true;
         }
 
-        var path = Environment.ProcessPath!;
+        ReadOnlySpan<char> path = Environment.ProcessPath!;
         return Path.GetFileNameWithoutExtension(path).EndsWith(nameof(HaX));
     }
 

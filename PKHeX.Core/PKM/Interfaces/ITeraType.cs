@@ -47,6 +47,28 @@ public static class TeraTypeUtil
     }
 
     /// <summary>
+    /// Indicates if the Tera Type value is valid (changed from anything to anything).
+    /// </summary>
+    /// <param name="override">Current override value</param>
+    /// <returns>True if valid.</returns>
+    public static bool IsValid(byte @override) => @override is <= MaxType or OverrideNone;
+
+    /// <summary>
+    /// Checks if Ogerpon's Tera Type is valid.
+    /// </summary>
+    /// <param name="type">Tera Type to check</param>
+    /// <param name="form">Ogerpon's form</param>
+    /// <returns>True if the Tera Type is valid.</returns>
+    public static bool IsValidOgerpon(byte type, byte form) => (form & 3) switch
+    {
+        0 => type is (byte)MoveType.Grass or OverrideNone,
+        1 => type is (byte)MoveType.Water,
+        2 => type is (byte)MoveType.Fire,
+        3 => type is (byte)MoveType.Rock,
+        _ => false,
+    };
+
+    /// <summary>
     /// Calculates the effective Tera Type based on the inputs.
     /// </summary>
     /// <param name="original">Unmodified Tera Type value initially encountered with.</param>
@@ -95,4 +117,27 @@ public static class TeraTypeUtil
         var type = (MoveType)type1;
         return type != (byte)MoveType.Normal ? type : (MoveType)type2;
     }
+
+    /// <summary>
+    /// Resets the <see cref="ITeraType.TeraTypeOriginal"/> and <see cref="ITeraType.TeraTypeOverride"/> values based on the <see cref="IEncounterTemplate"/> data.
+    /// </summary>
+    /// <param name="pk">Entity to check for</param>
+    /// <param name="enc">Original encounter</param>
+    public static void ResetTeraType(PK9 pk, IEncounterTemplate enc)
+    {
+        pk.TeraTypeOverride = enc is not ITeraType x ? (MoveType)OverrideNone : x.TeraTypeOverride; // WC9
+        pk.TeraTypeOriginal = enc switch
+        {
+            ITeraTypeReadOnly t => t.TeraType,
+            ITeraRaid9 t9 => (MoveType)Tera9RNG.GetTeraType(Tera9RNG.GetOriginalSeed(pk), t9.TeraType, enc.Species, enc.Form),
+            _ => (MoveType)Tera9RNG.GetTeraTypeFromPersonal(enc.Species, enc.Form, Util.Rand.Rand64()),
+        };
+    }
+
+    /// <summary>
+    /// Checks if the given species can have its Tera Type changed.
+    /// </summary>
+    /// <param name="species">Species to check</param>
+    /// <returns>True if the species can have its Tera Type changed.</returns>
+    public static bool CanChangeTeraType(ushort species) => species != (int)Species.Ogerpon;
 }

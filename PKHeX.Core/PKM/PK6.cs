@@ -381,7 +381,8 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
     public override int Stat_SPD { get => ReadUInt16LittleEndian(Data.AsSpan(0xFC)); set => WriteUInt16LittleEndian(Data.AsSpan(0xFC), (ushort)value); }
     #endregion
 
-    public int SuperTrainingMedalCount(int maxCount = 30) => BitOperations.PopCount(SuperTrainBitFlags >> 2);
+    private const int MedalCount = 30;
+    public int SuperTrainingMedalCount(int lowBitCount = MedalCount) => BitOperations.PopCount((SuperTrainBitFlags >> 2) & (uint.MaxValue >> (MedalCount - lowBitCount)));
 
     public bool IsUntradedEvent6 => Geo1_Country == 0 && Geo1_Region == 0 && Met_Location / 10000 == 4 && Gen6;
 
@@ -506,7 +507,7 @@ public sealed class PK6 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         span[0xAA..0xB0].Clear(); /* Unused/Amie Fullness & Enjoyment. */
         span[0xE4..0xE8].Clear(); /* Unused. */
         pk7.Data[0x72] &= 0xFC; /* Clear lower two bits of Super training flags. */
-        pk7.Data[0xDE] = 0; /* Gen IV encounter type. */
+        pk7.Data[0xDE] = 0; /* Gen4 encounter type. */
 
         // Copy Form Argument data for Furfrou and Hoopa, since we're nice.
         pk7.FormArgumentRemain = FormArgumentRemain;

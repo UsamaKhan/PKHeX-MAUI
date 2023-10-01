@@ -172,7 +172,7 @@ public static class PIDGenerator
                 return (pk, seed) => SetValuesFromSeedBACD(pk, t, seed);
 
             case PIDType.PokeSpot:
-                return SetRandomPIDIV;
+                return SetRandomPokeSpotPID;
 
             case PIDType.G5MGShiny:
                 return SetValuesFromSeedMG5Shiny;
@@ -197,17 +197,25 @@ public static class PIDGenerator
         // 1 3-bit for upper
         // 1 3-bit for lower
 
-        uint Next() => (seed = LCRNG.Next(seed)) >> 16;
-        uint lower = Next() & 7;
-        uint upper = Next() & 7;
+        uint lower = Next(ref seed) & 7;
+        uint upper = Next(ref seed) & 7;
         for (int i = 0; i < 13; i++)
-            lower |= (Next() & 1) << (3 + i);
+            lower |= (Next(ref seed) & 1) << (3 + i);
 
         upper = ((lower ^ pk.TID16 ^ pk.SID16) & 0xFFF8) | (upper & 0x7);
         pk.PID = (upper << 16) | lower;
         Span<int> IVs = stackalloc int[6];
-        MethodFinder.GetIVsInt32(IVs, Next(), Next());
+        MethodFinder.GetIVsInt32(IVs, Next(ref seed), Next(ref seed));
         pk.SetIVs(IVs);
+
+        static uint Next(ref uint seed) => (seed = LCRNG.Next(seed)) >> 16;
+    }
+
+    private static void SetRandomPokeSpotPID(PKM pk, uint seed)
+    {
+        var D = XDRNG.Next(seed); // PID
+        var E = XDRNG.Next(D); // PID
+        pk.PID = (D & 0xFFFF0000) | (E >> 16);
     }
 
     public static void SetRandomPokeSpotPID(PKM pk, int nature, int gender, int ability, int slot)
@@ -216,17 +224,15 @@ public static class PIDGenerator
         while (true)
         {
             var seed = rnd.Rand32();
-            if (!MethodFinder.IsPokeSpotActivation(slot, seed, out _))
+            if (!MethodFinder.IsPokeSpotActivation(slot, seed, out var newSeed))
                 continue;
 
-            var D = XDRNG.Next(seed); // PID
-            var E = XDRNG.Next(D); // PID
+            SetRandomPokeSpotPID(pk, newSeed);
+            pk.SetRandomIVs();
 
-            pk.PID = (D & 0xFFFF0000) | (E >> 16);
             if (!IsValidCriteria4(pk, nature, ability, gender))
                 continue;
 
-            pk.SetRandomIVs();
             return;
         }
     }
@@ -281,57 +287,19 @@ public static class PIDGenerator
         SetRandomIVs(pk);
     }
 
-    public static void SetRandomWildPID(PKM pk, int gen, int nature, int ability, int gender, PIDType specific = PIDType.None)
-    {
-        if (specific == PIDType.Pokewalker)
-        {
-            SetRandomPIDPokewalker(pk, nature, gender);
-            return;
-        }
-        switch (gen)
-        {
-            case 3:
-            case 4:
-                SetRandomWildPID4(pk, nature, ability, gender, specific);
-                break;
-            case 5:
-                SetRandomWildPID5(pk, nature, ability, gender, specific);
-                break;
-            default:
-                SetRandomWildPID(pk, nature, ability, gender);
-                break;
-        }
-    }
-
     public static void SetRandomPIDPokewalker(PKM pk, int nature, int gender)
     {
         // Pokewalker PIDs cannot yield multiple abilities from the input nature-gender-trainerID. Disregard any ability request.
+        var pi = pk.PersonalInfo.Gender;
         pk.Gender = gender;
-        do
-        {
-            pk.PID = GetPokeWalkerPID(pk.TID16, pk.SID16, (uint) nature, gender, pk.PersonalInfo.Gender);
-        } while (!pk.IsGenderValid());
-
+        pk.PID = GetPokeWalkerPID(pk.TID16, pk.SID16, (uint)nature, gender, pi);
         pk.RefreshAbility((int) (pk.PID & 1));
-        SetRandomIVs(pk);
     }
 
-    /// <summary>
-    /// Generates a <see cref="PKM.PID"/> and <see cref="PKM.IVs"/> that are unrelated.
-    /// </summary>
-    /// <param name="pk">Pokémon to modify.</param>
-    /// <param name="seed">Seed which is used for the <see cref="PKM.PID"/>.</param>
-    private static void SetRandomPIDIV(PKM pk, uint seed)
-    {
-        pk.PID = seed;
-        SetRandomIVs(pk);
-    }
-
-    private static void SetRandomWildPID4(PKM pk, int nature, int ability, int gender, PIDType specific = PIDType.None)
+    public static void SetRandomWildPID4(PKM pk, int nature, int ability, int gender, PIDType type)
     {
         pk.RefreshAbility(ability);
         pk.Gender = gender;
-        var type = GetPIDType(pk, specific);
         var method = GetGeneratorMethod(type);
 
         var rnd = Util.Rand;
@@ -352,32 +320,13 @@ public static class PIDGenerator
         if (pk.Nature != nature)
             return false;
 
-        if ((pk.PID & 1) != ability)
+        if ((pk.EncryptionConstant & 1) != ability)
             return false;
 
         return true;
     }
 
-    private static PIDType GetPIDType(PKM pk, PIDType specific)
-    {
-        if (specific != PIDType.None)
-            return specific;
-        if (pk.Version == 15)
-            return PIDType.CXD;
-        if (pk is { Species: (int)Species.Unown, Gen3: true })
-        {
-            return Util.Rand.Next(3) switch
-            {
-                1 => PIDType.Method_2_Unown,
-                2 => PIDType.Method_4_Unown,
-                _ => PIDType.Method_1_Unown,
-            };
-        }
-
-        return PIDType.Method_1;
-    }
-
-    private static void SetRandomWildPID5(PKM pk, int nature, int ability, int gender, PIDType specific = PIDType.None)
+    public static void SetRandomWildPID5(PKM pk, int nature, int ability, int gender, PIDType specific = PIDType.None)
     {
         var tidbit = (pk.TID16 ^ pk.SID16) & 1;
         pk.RefreshAbility(ability);
@@ -409,19 +358,8 @@ public static class PIDGenerator
             pk.PID = seed;
             if (pk.GetSaneGender() != gender)
                 continue;
-
-            SetRandomIVs(pk);
             return;
         }
-    }
-
-    private static void SetRandomWildPID(PKM pk, int nature, int ability, int gender)
-    {
-        pk.PID = Util.Rand32();
-        pk.Nature = nature;
-        pk.Gender = gender;
-        pk.RefreshAbility(ability);
-        SetRandomIVs(pk);
     }
 
     private static void SetRandomIVs(PKM pk)

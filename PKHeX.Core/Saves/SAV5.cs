@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace PKHeX.Core;
@@ -22,7 +23,7 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     public override Type PKMType => typeof(PK5);
 
     public override int BoxCount => 24;
-    public override int MaxEV => 255;
+    public override int MaxEV => EffortValues.Max255;
     public override int Generation => 5;
     public override EntityContext Context => EntityContext.Gen5;
     public override int MaxStringLengthOT => 7;
@@ -39,7 +40,7 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     public override int MaxBallID => Legal.MaxBallID_5;
     public override int MaxGameID => Legal.MaxGameID_5; // B2
 
-    protected SAV5(int size) : base(size)
+    protected SAV5([ConstantExpected] int size) : base(size)
     {
         Initialize();
         ClearBoxes();
@@ -114,8 +115,8 @@ public abstract class SAV5 : SaveFile, ISaveBlock5BW, IEventFlag37
     {
         var pk5 = (PK5)pk;
         // Apply to this Save File
-        DateTime Date = DateTime.Now;
-        if (pk5.Trade(OT, ID32, Gender, Date.Day, Date.Month, Date.Year))
+        var now = EncounterDate.GetDateNDS();
+        if (pk5.Trade(OT, ID32, Gender, now.Day, now.Month, now.Year))
             pk.RefreshChecksum();
     }
 

@@ -34,11 +34,10 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
     public bool CanBeReceivedByVersion(PKM pk) => RestrictVersion switch
     {
         0 when !IsEntity => true, // Whatever, essentially unrestricted for SL/VL receipt. No Entity gifts are 0.
-        1 => pk.Version is (int)GameVersion.SL || pk is PK8 { Met_Location: LocationsHOME.SWSL, Version: (int)GameVersion.SW },
-        2 => pk.Version is (int)GameVersion.VL || pk is PK8 { Met_Location: LocationsHOME.SHVL, Version: (int)GameVersion.SH },
-        3 => pk.Version is (int)GameVersion.SL || pk is PK8 { Met_Location: LocationsHOME.SWSL, Version: (int)GameVersion.SW }
-          || pk.Version is (int)GameVersion.VL || pk is PK8 { Met_Location: LocationsHOME.SHVL, Version: (int)GameVersion.SH },
-        _ => throw new ArgumentOutOfRangeException(nameof(RestrictVersion), RestrictVersion, null),
+        1 => pk.Version is (int)GameVersion.SL || pk.Met_Location == LocationsHOME.SWSL,
+        2 => pk.Version is (int)GameVersion.VL || pk.Met_Location == LocationsHOME.SHVL,
+        3 => pk.Version is (int)GameVersion.SL or (int)GameVersion.VL || pk.Met_Location is LocationsHOME.SWSL or LocationsHOME.SHVL,
+          _ => throw new ArgumentOutOfRangeException(nameof(RestrictVersion), RestrictVersion, null),
     };
 
     // General Card Properties
@@ -128,6 +127,12 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
     // Since we expose the 16bit (pk9) component values here, just adjust them accordingly with an inlined calc.
     public override uint ID32
     {
+        get => ReadUInt32LittleEndian(Data.AsSpan(CardStart + 0x18));
+        set => WriteUInt32LittleEndian(Data.AsSpan(CardStart + 0x18), value);
+    }
+
+    public uint ID32Old
+    {
         get => ReadUInt32LittleEndian(Data.AsSpan(CardStart + 0x18)) - (1000000u * (uint)CardID);
         set => WriteUInt32LittleEndian(Data.AsSpan(CardStart + 0x18), value + (1000000u * (uint)CardID));
     }
@@ -199,8 +204,13 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
 
     public int MetLevel { get => Data[CardStart + 0x241]; set => Data[CardStart + 0x241] = (byte)value; }
     public MoveType TeraTypeOriginal { get => (MoveType)Data[CardStart + 0x242]; set => Data[CardStart + 0x242] = (byte)value; }
-    public MoveType TeraTypeOverride { get => (MoveType)Data[CardStart + 0x243]; set => Data[CardStart + 0x243] = (byte)value; }
-    public MoveType TeraType => TeraTypeUtil.GetTeraType((byte)TeraTypeOriginal, (byte)TeraTypeOverride);
+    public MoveType TeraTypeOverride
+    {
+        get => (MoveType)TeraTypeUtil.OverrideNone;
+        set { }
+    }
+
+    public MoveType TeraType => TeraTypeOriginal;
     public short HeightValue { get => ReadInt16LittleEndian(Data.AsSpan(CardStart + 0x244)); set => WriteInt16LittleEndian(Data.AsSpan(CardStart + 0x244), value); }
     public short WeightValue { get => ReadInt16LittleEndian(Data.AsSpan(CardStart + 0x246)); set => WriteInt16LittleEndian(Data.AsSpan(CardStart + 0x246), value); }
 
@@ -444,8 +454,7 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
         var pk = new PK9
         {
             EncryptionConstant = EncryptionConstant != 0 ? EncryptionConstant : rnd.Rand32(),
-            TID16 = TID16,
-            SID16 = SID16,
+            ID32 = ID32,
             Species = Species,
             Form = Form,
             CurrentLevel = currentLevel,
@@ -502,14 +511,18 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
             while (!CanBeReceivedByVersion(pk));
         }
 
+        var date = GetSuggestedDate();
+        pk.MetDate = date;
+
         if (OTGender >= 2)
         {
             pk.TID16 = tr.TID16;
             pk.SID16 = tr.SID16;
         }
-
-        var date = GetSuggestedDate();
-        pk.MetDate = date;
+        else if (IsBeforePatch200(date))
+        {
+            pk.ID32 = ID32Old;
+        }
 
         var nickname_language = GetLanguage(language);
         pk.Language = nickname_language != 0 ? nickname_language : tr.Language;
@@ -547,32 +560,33 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
     private static bool IsBeforePatch120(int cardID) => cardID is 0001 or 0006 or 0501 or 1501; // Flabébé, Gyarados, Pikachu, Garganacl
 
     private const int DayNumber20230301 = 738579; // S/V Patch 1.2.0
-    private static bool IsBeforePatch120(DateOnly date) => date.DayNumber < DayNumber20230301;
+    private const int DayNumber20230913 = 738775; // S/V Patch 2.0.1
+    private static bool IsBeforePatch120(DateOnly date) => date.DayNumber < DayNumber20230301; // scale handling updated
+    private static bool IsBeforePatch200(DateOnly date) => date.DayNumber <= DayNumber20230913; // ID32 handling updated
 
     private DateOnly GetSuggestedDate()
     {
         if (!IsDateRestricted)
-            return DateOnly.FromDateTime(DateTime.Now);
+            return EncounterDate.GetDateSwitch();
         if (EncounterServerDate.WC9GiftsChk.TryGetValue(Checksum, out var range))
             return range.Start;
         if (EncounterServerDate.WC9Gifts.TryGetValue(CardID, out range))
             return range.Start;
-        return DateOnly.FromDateTime(DateTime.Now);
+        return EncounterDate.GetDateSwitch();
     }
 
-    private void SetEggMetData(PKM pk)
+    private void SetEggMetData(PK9 pk)
     {
         pk.IsEgg = true;
-        pk.EggMetDate = DateOnly.FromDateTime(DateTime.Now);
+        pk.EggMetDate = EncounterDate.GetDateSwitch();
         pk.Nickname = SpeciesName.GetEggName(pk.Language, Generation);
         pk.IsNicknamed = true;
     }
 
-    private void SetPINGA(PKM pk, EncounterCriteria criteria)
+    private void SetPINGA(PK9 pk, EncounterCriteria criteria)
     {
-        var pi = PersonalTable.SV.GetFormEntry(Species, Form);
-        pk.Nature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
-        pk.StatNature = pk.Nature;
+        var pi = pk.PersonalInfo;
+        pk.Nature = pk.StatNature = (int)criteria.GetNature(Nature == -1 ? Core.Nature.Random : (Nature)Nature);
         pk.Gender = criteria.GetGender(Gender, pi);
         var av = GetAbilityIndex(criteria);
         pk.RefreshAbility(av);
@@ -627,12 +641,12 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
         return pid;
     }
 
-    private void SetPID(PKM pk)
+    private void SetPID(PK9 pk)
     {
         pk.PID = GetPID(pk, PIDType);
     }
 
-    private void SetIVs(PKM pk)
+    private void SetIVs(PK9 pk)
     {
         Span<int> finalIVs = stackalloc int[6];
         GetIVs(finalIVs);
@@ -666,8 +680,8 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
         {
             if (OTGender < 2)
             {
-                if (SID16 != pk.SID16) return false;
-                if (TID16 != pk.TID16) return false;
+                var expect = pk.MetDate is { } x && IsBeforePatch200(x) ? ID32Old : ID32;
+                if (expect != pk.ID32) return false;
                 if (OTGender != pk.OT_Gender) return false;
             }
 
@@ -714,16 +728,7 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
         {
             if (!shinyType.IsValid(pk)) return false;
             if (!IsMatchEggLocation(pk)) return false;
-            if (pk is PK8)
-            {
-                if (!LocationsHOME.IsValidMetSV((ushort)pk.Met_Location, pk.Version))
-                    return false;
-            }
-            else
-            {
-                if (MetLocation != pk.Met_Location)
-                    return false;
-            }
+            if (!IsMatchLocation(pk)) return false;
         }
 
         if (MetLevel != 0 && MetLevel != pk.Met_Level) return false;
@@ -738,12 +743,14 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
                 return false;
             if (s.WeightScalar != WeightValue)
                 return false;
-            if (pk is IScaledSize3 scale)
+
+            if (!IsBeforePatch120(CardID) || (pk.MetDate is { } valid && !IsBeforePatch120(valid)))
             {
-                if (!IsBeforePatch120(CardID) || (pk.MetDate is { } valid && !IsBeforePatch120(valid)))
+                // S/V 1.2.0 added scale specification.
+                if (Scale != 256)
                 {
-                    // S/V 1.2.0 added scale specification.
-                    if (Scale != 256 && Scale != scale.Scale)
+                    var current = pk is IScaledSize3 s3 ? s3.Scale : s.HeightScalar;
+                    if (Scale != current)
                         return false;
                 }
             }
@@ -758,9 +765,30 @@ public sealed class WC9 : DataMysteryGift, ILangNick, INature, ITeraType, IRibbo
         return pk.PID == GetPID(pk, type);
     }
 
+    private bool IsMatchLocation(PKM pk)
+    {
+        var metState = LocationsHOME.GetRemapState(Context, pk.Context);
+        if (metState == LocationRemapState.Original)
+            return IsMatchLocationExact(pk);
+        if (metState == LocationRemapState.Remapped)
+            return IsMatchLocationRemapped(pk);
+        return IsMatchLocationExact(pk) || IsMatchLocationRemapped(pk);
+    }
+
+    private bool IsMatchLocationExact(PKM pk) => pk.Met_Location == Location;
+
+    private bool IsMatchLocationRemapped(PKM pk)
+    {
+        var met = (ushort)pk.Met_Location;
+        var version = pk.Version;
+        if (pk.Context == EntityContext.Gen8)
+            return LocationsHOME.IsValidMetSV(met, version);
+        return LocationsHOME.GetMetSWSH((ushort)Location, version) == met;
+    }
+
     public bool IsDateRestricted => true;
 
-    protected override bool IsMatchDeferred(PKM pk) => Species != pk.Species;
+    protected override bool IsMatchDeferred(PKM pk) => false;
     protected override bool IsMatchPartial(PKM pk)
     {
         if (pk is ITeraType t && TeraType != t.TeraTypeOriginal)
