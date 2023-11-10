@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using static PKHeX.Core.GroundTileAllowed;
 
 namespace PKHeX.Core;
@@ -103,16 +104,44 @@ public sealed record EncounterStatic4(GameVersion Version)
         // Pichu is special -- use Pokewalker method
         if (Species == (int)Core.Species.Pichu)
         {
-            PIDGenerator.SetRandomPIDPokewalker(pk, (byte)Nature, Gender);
-            criteria.SetRandomIVs(pk);
+            var pid = pk.PID = PokewalkerRNG.GetPID(pk.ID32, (uint)Nature, pk.Gender = Gender, pi.Gender);
+            pk.RefreshAbility((int)(pid & 1));
+            criteria.SetRandomIVs(pk); // IVs are sufficiently random; set based on request.
             return;
         }
 
         int gender = criteria.GetGender(Gender, pi);
         int nature = (int)criteria.GetNature(Nature);
         int ability = criteria.GetAbilityFromNumber(Ability);
+        if (Shiny == Shiny.Always) // Chain Shiny
+        {
+            SetChainShiny(pk, pi.Gender, ability, gender, nature);
+            return;
+        }
         PIDType type = this is { Shiny: Shiny.Always } ? PIDType.ChainShiny : PIDType.Method_1;
         PIDGenerator.SetRandomWildPID4(pk, nature, ability, gender, type);
+    }
+
+    private static void SetChainShiny(PK4 pk, byte gr, int ability, int gender, int nature)
+    {
+        pk.RefreshAbility(ability);
+        pk.Gender = gender;
+        var seed = Util.Rand32();
+        var id32 = pk.ID32;
+        while (true)
+        {
+            var pid = ClassicEraRNG.GetChainShinyPID(ref seed, id32);
+            if (pid % 25 != nature)
+                continue;
+            if (EntityGender.GetFromPIDAndRatio(pid, gr) != gender)
+                continue;
+            if ((pid & 1) != ability)
+                continue;
+
+            pk.PID = pid;
+            pk.IV32 = ClassicEraRNG.GetSequentialIVs(ref seed);
+            break;
+        }
     }
 
     #endregion
@@ -215,7 +244,7 @@ public sealed record EncounterStatic4(GameVersion Version)
 
     private bool IsMatchPartial(PKM pk) => Gift && pk.Ball != (byte)FixedBall;
 
-    public static bool IsMatchRoamerLocation(ulong permit, int location, int first)
+    public static bool IsMatchRoamerLocation([ConstantExpected] ulong permit, int location, int first)
     {
         var value = location - first;
         if ((uint)value >= 64)
@@ -223,7 +252,7 @@ public sealed record EncounterStatic4(GameVersion Version)
         return (permit & (1ul << value)) != 0;
     }
 
-    public static bool IsMatchRoamerLocation(uint permit, int location, int first)
+    public static bool IsMatchRoamerLocation([ConstantExpected] uint permit, int location, int first)
     {
         var value = location - first;
         if ((uint)value >= 32)

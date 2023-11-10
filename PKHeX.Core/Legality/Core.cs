@@ -17,10 +17,10 @@ public static class Legal
     internal const int MaxItemID_2 = 255;
     internal const int MaxAbilityID_2 = 0;
 
-    internal const int MaxSpeciesIndex_3 = 412;
     internal const int MaxSpeciesID_3 = 386;
     internal const int MaxMoveID_3 = 354;
     internal const int MaxItemID_3 = 374;
+    internal const int MaxItemID_3_E = 376;
     internal const int MaxItemID_3_COLO = 547;
     internal const int MaxItemID_3_XD = 593;
     internal const int MaxAbilityID_3 = 77;

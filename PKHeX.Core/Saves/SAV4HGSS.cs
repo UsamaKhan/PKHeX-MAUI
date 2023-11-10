@@ -28,10 +28,18 @@ public sealed class SAV4HGSS : SAV4
     public override PersonalTable4 Personal => PersonalTable.HGSS;
     public override ReadOnlySpan<ushort> HeldItems => Legal.HeldItems_HGSS;
     public override int MaxItemID => Legal.MaxItemID_4_HGSS;
-    private const int GeneralSize = 0xF628;
+    public const int GeneralSize = 0xF628;
     private const int StorageSize = 0x12310; // Start 0xF700, +0 starts box data
     private const int GeneralGap = 0xD8;
     protected override int FooterSize => 0x10;
+    protected override BlockInfo4[] ExtraBlocks => new[] {
+        new BlockInfo4(0, 0x23000, 0x2AC0), // Hall of Fame
+        new BlockInfo4(1, 0x26000, 0x0BB0), // Battle Hall
+        new BlockInfo4(2, 0x27000, 0x1D60), // Battle Video (My Video)
+        new BlockInfo4(3, 0x29000, 0x1D60), // Battle Video (Other Videos 1)
+        new BlockInfo4(4, 0x2B000, 0x1D60), // Battle Video (Other Videos 2)
+        new BlockInfo4(5, 0x2D000, 0x1D60), // Battle Video (Other Videos 3)
+    };
 
     private void Initialize()
     {
@@ -48,6 +56,7 @@ public sealed class SAV4HGSS : SAV4
         Trainer1 = 0x64;
         Party = 0x98;
         PokeDex = 0x12B8;
+        Extra = 0x230C;
         Geonet = 0x8D44;
         WondercardFlags = 0x9D3C;
         WondercardData = 0x9E3C;
@@ -254,9 +263,11 @@ public sealed class SAV4HGSS : SAV4
 
     public void PokewalkerCoursesSetAll(uint value = 0x07FF_FFFFu) => WriteUInt32LittleEndian(General[(OFS_WALKER + 0x8)..], value);
 
+    // Swarm
     public override uint SwarmSeed { get => ReadUInt32LittleEndian(General[0x68A8..]); set => WriteUInt32LittleEndian(General[0x68A8..], value); }
     public override uint SwarmMaxCountModulo => 20;
 
+    // Roamers
     public Roamer4 RoamerRaikou => GetRoamer(0);
     public Roamer4 RoamerEntei  => GetRoamer(1);
     public Roamer4 RoamerLatias => GetRoamer(2);
@@ -269,4 +280,7 @@ public sealed class SAV4HGSS : SAV4
         var mem = GeneralBuffer.Slice(ofs, size);
         return new Roamer4(mem);
     }
+
+    // Pokeathlon
+    public uint PokeathlonPoints { get => ReadUInt32LittleEndian(General[0xE548..]); set => WriteUInt32LittleEndian(General[0xE548..], value); }
 }
