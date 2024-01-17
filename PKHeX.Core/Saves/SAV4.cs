@@ -40,7 +40,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     public sealed override bool GetFlag(int offset, int bitIndex) => FlagUtil.GetFlag(General, offset, bitIndex);
     public sealed override void SetFlag(int offset, int bitIndex, bool value) => FlagUtil.SetFlag(General, offset, bitIndex, value);
 
-    protected SAV4(int gSize, int sSize)
+    protected SAV4([ConstantExpected] int gSize, [ConstantExpected] int sSize)
     {
         GeneralBuffer = new byte[gSize];
         StorageBuffer = new byte[sSize];
@@ -49,7 +49,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
         ClearBoxes();
     }
 
-    protected SAV4(byte[] data, int gSize, int sSize, int sStart) : base(data)
+    protected SAV4(byte[] data, [ConstantExpected] int gSize, [ConstantExpected] int sSize, [ConstantExpected] int sStart) : base(data)
     {
         var GeneralBlockPosition = GetActiveBlock(data, 0, gSize);
         var StorageBlockPosition = GetActiveBlock(data, sStart, sSize);
@@ -173,7 +173,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
         }
     }
 
-    private static int GetActiveBlock(ReadOnlySpan<byte> data, [ConstantExpected(Min = 0)] int begin, [ConstantExpected(Min = 0)] int length)
+    private static int GetActiveBlock(ReadOnlySpan<byte> data, [ConstantExpected] int begin, [ConstantExpected] int length)
     {
         int offset = begin + length - 0x14;
         return SAV4BlockDetection.CompareFooters(data, offset, offset + PartitionSize);
@@ -189,11 +189,11 @@ public abstract class SAV4 : SaveFile, IEventFlag37
 
         // Battle Hall/Battle Videos
         var KeyOffset = Extra;
-        var KeyBackupOffset = Extra + 0x4 * (ExtraBlocks.Count - 1);
-        var PreferOffset = Extra + 2 * 0x4 * (ExtraBlocks.Count - 1);
-        var key = ReadUInt32LittleEndian(General[(KeyOffset + 0x4 * (index - 1))..]);
-        var keyBackup = ReadUInt32LittleEndian(General[(KeyBackupOffset + 0x4 * (index - 1))..]);
-        var prefer = General[(PreferOffset + (index - 1))];
+        var KeyBackupOffset = Extra + (0x4 * (ExtraBlocks.Count - 1));
+        var PreferOffset = Extra + (2 * 0x4 * (ExtraBlocks.Count - 1));
+        var key = ReadUInt32LittleEndian(General[(KeyOffset + (0x4 * (index - 1)))..]);
+        var keyBackup = ReadUInt32LittleEndian(General[(KeyBackupOffset + (0x4 * (index - 1)))..]);
+        var prefer = General[PreferOffset + (index - 1)];
         return SAV4BlockDetection.CompareExtra(Data, Data.AsSpan(PartitionSize), block, key, keyBackup, prefer);
     }
 
@@ -201,16 +201,19 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     {
         var block = ExtraBlocks[1];
         var active = GetActiveExtraBlock(block);
-        return active == -1 ? null : new Hall4(Data, (active == 0 ? 0 : PartitionSize) + block.Offset);
+        return active == -1 ? null : new Hall4(Data.AsMemory((active == 0 ? 0 : PartitionSize) + block.Offset, Hall4.SIZE_BLOCK));
     }
 
     protected int WondercardFlags = int.MinValue;
     protected int AdventureInfo = int.MinValue;
     protected int Seal = int.MinValue;
-    public int Geonet = int.MinValue;
+    public int Geonet { get; protected set; } = int.MinValue;
     protected int Extra = int.MinValue;
     protected int Trainer1;
     public int GTS { get; protected set; } = int.MinValue;
+
+    public int ChatterOffset { get; protected set; } = int.MinValue;
+    public Chatter4 Chatter => new(this);
 
     // Storage
     public override int PartyCount
@@ -412,8 +415,8 @@ public abstract class SAV4 : SaveFile, IEventFlag37
                 if (!pcd.GiftEquals(pgt))
                     continue;
 
-                if (this is SAV4HGSS)
-                    j++; // hgss 0,1,2; dppt 1,2,3
+                if (this is not SAV4HGSS)
+                    j++; // HG/SS 0,1,2; D/P/Pt 1,2,3
                 indexes[i] = pgt.Slot = j;
                 break;
             }
@@ -601,7 +604,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
     #endregion
 
     // Seals
-    private const byte SealMaxCount = 99;
+    public const byte SealMaxCount = 99;
 
     public Span<byte> GetSealCase() => General.Slice(Seal, (int)Seal4.MAX);
     public void SetSealCase(ReadOnlySpan<byte> value) => SetData(General.Slice(Seal, (int)Seal4.MAX), value);
@@ -649,4 +652,7 @@ public abstract class SAV4 : SaveFile, IEventFlag37
                 ++SwarmSeed;
         }
     }
+
+    public abstract int BP { get; set; }
+    public abstract BattleFrontierFacility4 MaxFacility { get; }
 }

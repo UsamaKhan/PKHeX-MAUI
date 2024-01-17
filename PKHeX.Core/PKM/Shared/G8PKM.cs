@@ -6,7 +6,7 @@ namespace PKHeX.Core;
 
 /// <summary> Generation 8 <see cref="PKM"/> format. </summary>
 public abstract class G8PKM : PKM, ISanityChecksum,
-    ITechRecord, ISociability, IContestStats, IHyperTrain, IScaledSize, IGigantamax, IFavorite, IDynamaxLevel, IHandlerLanguage, IFormArgument, IHomeTrack, IBattleVersion, ITrainerMemories, IPokerusStatus,
+    ITechRecord, ISociability, IContestStats, IHyperTrain, IScaledSize, IGigantamax, IFavorite, IDynamaxLevel, IHandlerLanguage, IFormArgument, IHomeTrack, IBattleVersion, ITrainerMemories, IPokerusStatus, IAppliedMarkings7,
     IRibbonIndex, IRibbonSetAffixed, IRibbonSetRibbons, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetCommon7, IRibbonSetCommon8,  IRibbonSetCommon9, IRibbonSetMarks, IRibbonSetMark8, IRibbonSetMark9
 {
     protected G8PKM() : base(PokeCrypto.SIZE_8PARTY) { }
@@ -104,7 +104,7 @@ public abstract class G8PKM : PKM, ISanityChecksum,
     public bool IsFavorite { get => (Data[0x16] & 8) != 0; set => Data[0x16] = (byte)((Data[0x16] & ~8) | ((value ? 1 : 0) << 3)); } // unused, was in LGP/E but not in SW/SH
     public bool CanGigantamax { get => (Data[0x16] & 16) != 0; set => Data[0x16] = (byte)((Data[0x16] & ~16) | (value ? 16 : 0)); }
     // 0x17 alignment unused
-    public override int MarkValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x18)); set => WriteUInt16LittleEndian(Data.AsSpan(0x18), (ushort)value); }
+    public ushort MarkingValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x18)); set => WriteUInt16LittleEndian(Data.AsSpan(0x18), value); }
     // 0x1A alignment unused
     // 0x1B alignment unused
     public override uint PID { get => ReadUInt32LittleEndian(Data.AsSpan(0x1C)); set => WriteUInt32LittleEndian(Data.AsSpan(0x1C), value); }
@@ -264,7 +264,7 @@ public abstract class G8PKM : PKM, ISanityChecksum,
     public bool RibbonMarkAlpha       { get => FlagUtil.GetFlag(Data, 0x45, 3); set => FlagUtil.SetFlag(Data, 0x45, 3, value); }
     public bool RibbonMarkMightiest   { get => FlagUtil.GetFlag(Data, 0x45, 4); set => FlagUtil.SetFlag(Data, 0x45, 4, value); }
     public bool RibbonMarkTitan       { get => FlagUtil.GetFlag(Data, 0x45, 5); set => FlagUtil.SetFlag(Data, 0x45, 5, value); }
-    public bool RIB45_6 { get => FlagUtil.GetFlag(Data, 0x45, 6); set => FlagUtil.SetFlag(Data, 0x45, 6, value); }
+    public bool RibbonPartner         { get => FlagUtil.GetFlag(Data, 0x45, 6); set => FlagUtil.SetFlag(Data, 0x45, 6, value); }
     public bool RIB45_7 { get => FlagUtil.GetFlag(Data, 0x45, 7); set => FlagUtil.SetFlag(Data, 0x45, 7, value); }
 
     public bool RIB46_0 { get => FlagUtil.GetFlag(Data, 0x46, 0); set => FlagUtil.SetFlag(Data, 0x46, 0, value); }
@@ -377,7 +377,7 @@ public abstract class G8PKM : PKM, ISanityChecksum,
     public Span<byte> PokeJob => Data.AsSpan(0xCE, 14);
     public bool GetPokeJobFlag(int index) => FlagUtil.GetFlag(PokeJob, index >> 3, index & 7);
     public void SetPokeJobFlag(int index, bool value) => FlagUtil.SetFlag(PokeJob, index >> 3, index & 7, value);
-    public bool GetPokeJobFlagAny() => PokeJob.IndexOfAnyExcept<byte>(0) >= 0;
+    public bool GetPokeJobFlagAny() => PokeJob.ContainsAnyExcept<byte>(0);
     public void ClearPokeJobFlags() => PokeJob.Clear();
 
     public override byte Fullness { get => Data[0xDC]; set => Data[0xDC] = value; }
@@ -432,7 +432,7 @@ public abstract class G8PKM : PKM, ISanityChecksum,
     public Span<byte> RecordFlags => Data.AsSpan(0x127, 14);
     public bool GetMoveRecordFlag(int index) => FlagUtil.GetFlag(RecordFlags, index >> 3, index & 7);
     public void SetMoveRecordFlag(int index, bool value) => FlagUtil.SetFlag(RecordFlags, index >> 3, index & 7, value);
-    public bool GetMoveRecordFlagAny() => RecordFlags.IndexOfAnyExcept<byte>(0) >= 0;
+    public bool GetMoveRecordFlagAny() => RecordFlags.ContainsAnyExcept<byte>(0);
     public void ClearMoveRecordFlags() => RecordFlags.Clear();
 
     // Why did you mis-align this field, GameFreak?
@@ -454,22 +454,29 @@ public abstract class G8PKM : PKM, ISanityChecksum,
     public override int Stat_SPD   { get => ReadUInt16LittleEndian(Data.AsSpan(0x154)); set => WriteUInt16LittleEndian(Data.AsSpan(0x154), (ushort)value); }
     #endregion
 
-    public override int MarkingCount => 6;
+    public int MarkingCount => 6;
 
-    public override int GetMarking(int index)
+    public MarkingColor GetMarking(int index)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
-        return (MarkValue >> (index * 2)) & 3;
+        return (MarkingColor)((MarkingValue >> (index * 2)) & 3);
     }
 
-    public override void SetMarking(int index, int value)
+    public void SetMarking(int index, MarkingColor value)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
         var shift = index * 2;
-        MarkValue = (MarkValue & ~(0b11 << shift)) | ((value & 3) << shift);
+        MarkingValue = (ushort)((MarkingValue & ~(0b11 << shift)) | (((byte)value & 3) << shift));
     }
+
+    public MarkingColor MarkingCircle   { get => GetMarking(0); set => SetMarking(0, value); }
+    public MarkingColor MarkingTriangle { get => GetMarking(1); set => SetMarking(1, value); }
+    public MarkingColor MarkingSquare   { get => GetMarking(2); set => SetMarking(2, value); }
+    public MarkingColor MarkingHeart    { get => GetMarking(3); set => SetMarking(3, value); }
+    public MarkingColor MarkingStar     { get => GetMarking(4); set => SetMarking(4, value); }
+    public MarkingColor MarkingDiamond  { get => GetMarking(5); set => SetMarking(5, value); }
 
     public bool GetRibbon(int index) => FlagUtil.GetFlag(Data, GetRibbonByte(index), index & 7);
     public void SetRibbon(int index, bool value = true) => FlagUtil.SetFlag(Data, GetRibbonByte(index), index & 7, value);

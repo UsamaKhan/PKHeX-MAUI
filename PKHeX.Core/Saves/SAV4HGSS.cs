@@ -32,14 +32,16 @@ public sealed class SAV4HGSS : SAV4
     private const int StorageSize = 0x12310; // Start 0xF700, +0 starts box data
     private const int GeneralGap = 0xD8;
     protected override int FooterSize => 0x10;
-    protected override BlockInfo4[] ExtraBlocks => new[] {
+
+    protected override BlockInfo4[] ExtraBlocks =>
+    [
         new BlockInfo4(0, 0x23000, 0x2AC0), // Hall of Fame
         new BlockInfo4(1, 0x26000, 0x0BB0), // Battle Hall
         new BlockInfo4(2, 0x27000, 0x1D60), // Battle Video (My Video)
         new BlockInfo4(3, 0x29000, 0x1D60), // Battle Video (Other Videos 1)
         new BlockInfo4(4, 0x2B000, 0x1D60), // Battle Video (Other Videos 2)
         new BlockInfo4(5, 0x2D000, 0x1D60), // Battle Video (Other Videos 3)
-    };
+    ];
 
     private void Initialize()
     {
@@ -49,6 +51,7 @@ public sealed class SAV4HGSS : SAV4
 
     protected override int EventWork => 0xDE4;
     protected override int EventFlag => 0x10C4;
+    public override BattleFrontierFacility4 MaxFacility => BattleFrontierFacility4.Arcade;
 
     private void GetSAVOffsets()
     {
@@ -57,6 +60,7 @@ public sealed class SAV4HGSS : SAV4
         Party = 0x98;
         PokeDex = 0x12B8;
         Extra = 0x230C;
+        ChatterOffset = 0x4E74;
         Geonet = 0x8D44;
         WondercardFlags = 0x9D3C;
         WondercardData = 0x9E3C;
@@ -73,6 +77,12 @@ public sealed class SAV4HGSS : SAV4
     {
         get => new(LockCapsuleSpan.ToArray());
         set => value.Data.CopyTo(LockCapsuleSpan);
+    }
+
+    public MapUnlockState4 MapUnlockState
+    {
+        get => (MapUnlockState4)((General[0xBAE7] >> 3) & 3);
+        set => General[0xBAE7] = (byte)((General[0xBAE7] & 0xE7) | ((byte)value << 3));
     }
 
     #region Storage
@@ -106,7 +116,7 @@ public sealed class SAV4HGSS : SAV4
 
     public override byte[] BoxFlags
     {
-        get => new[] { Storage[BOX_FLAGS] };
+        get => [ Storage[BOX_FLAGS] ];
         set => Storage[BOX_FLAGS] = value[0];
     }
 
@@ -155,7 +165,7 @@ public sealed class SAV4HGSS : SAV4
         {
             var info = ItemStorage4HGSS.Instance;
             InventoryPouch[] pouch =
-            {
+            [
                 new InventoryPouch4(InventoryType.Items, info, 999, 0x644), // 0x644-0x8D7 (0x8CB)
                 new InventoryPouch4(InventoryType.KeyItems, info, 1, 0x8D8), // 0x8D8-0x99F (0x979)
                 new InventoryPouch4(InventoryType.TMHMs, info, 99, 0x9A0), // 0x9A0-0xB33 (0xB2F)
@@ -164,7 +174,7 @@ public sealed class SAV4HGSS : SAV4
                 new InventoryPouch4(InventoryType.Berries, info, 999, 0xC04), // 0xC04-0xD03
                 new InventoryPouch4(InventoryType.Balls, info, 999, 0xD04), // 0xD04-0xD63
                 new InventoryPouch4(InventoryType.BattleItems, info, 999, 0xD64), // 0xD64-0xD97
-            };
+            ];
             return pouch.LoadAll(General);
         }
         set => value.SaveAll(General);
@@ -223,8 +233,8 @@ public sealed class SAV4HGSS : SAV4
         dex[start..].Fill(PokegearNumber.None);
     }
 
-    private static ReadOnlySpan<PokegearNumber> NotTrainers => new[]
-    {
+    private static ReadOnlySpan<PokegearNumber> NotTrainers =>
+    [
         PokegearNumber.Mother,
         PokegearNumber.Professor_Elm,
         PokegearNumber.Professor_Oak,
@@ -236,7 +246,7 @@ public sealed class SAV4HGSS : SAV4
         PokegearNumber.Bill,
         PokegearNumber.Bike_Shop,
         PokegearNumber.Baoba,
-    };
+    ];
 
     public void PokeGearUnlockAllCallersNoTrainers()
     {
@@ -258,14 +268,29 @@ public sealed class SAV4HGSS : SAV4
     public uint PokewalkerSteps { get => ReadUInt32LittleEndian(General[OFS_WALKER..]); set => WriteUInt32LittleEndian(General[OFS_WALKER..], value); }
     public uint PokewalkerWatts { get => ReadUInt32LittleEndian(General[(OFS_WALKER + 0x4)..]); set => WriteUInt32LittleEndian(General[(OFS_WALKER + 4)..], value); }
 
-    public bool[] GetPokewalkerCoursesUnlocked() => FlagUtil.GitBitFlagArray(General[(OFS_WALKER + 0x8)..], 32);
-    public void SetPokewalkerCoursesUnlocked(ReadOnlySpan<bool> value) => FlagUtil.SetBitFlagArray(General[(OFS_WALKER + 0x8)..], value);
+    public const int PokewalkerCourseFlagCount = 32;
+    public void GetPokewalkerCoursesUnlocked(Span<bool> value)
+    {
+        if (value.Length != PokewalkerCourseFlagCount)
+            throw new ArgumentOutOfRangeException(nameof(value));
+        FlagUtil.GetBitFlagArray(General[(OFS_WALKER + 0x8)..], value);
+    }
 
-    public void PokewalkerCoursesSetAll(uint value = 0x07FF_FFFFu) => WriteUInt32LittleEndian(General[(OFS_WALKER + 0x8)..], value);
+    public void SetPokewalkerCoursesUnlocked(ReadOnlySpan<bool> value)
+    {
+        if (value.Length != PokewalkerCourseFlagCount)
+            throw new ArgumentOutOfRangeException(nameof(value));
+        FlagUtil.SetBitFlagArray(General[(OFS_WALKER + 0x8)..], value);
+    }
+
+    public void PokewalkerCoursesUnlockAll() => PokewalkerCoursesSetAll(0x07FF_FFFFu); // 31 used
+    public void PokewalkerCoursesUnlockNone() => PokewalkerCoursesSetAll(0);
+    public void PokewalkerCoursesSetAll(uint bitFlags) => WriteUInt32LittleEndian(General[(OFS_WALKER + 0x8)..], bitFlags);
 
     // Swarm
     public override uint SwarmSeed { get => ReadUInt32LittleEndian(General[0x68A8..]); set => WriteUInt32LittleEndian(General[0x68A8..], value); }
     public override uint SwarmMaxCountModulo => 20;
+    public override int BP { get => ReadUInt16LittleEndian(General[0x5BB8..]); set => WriteUInt16LittleEndian(General[0x5BB8..], (ushort)value); }
 
     // Roamers
     public Roamer4 RoamerRaikou => GetRoamer(0);
@@ -283,4 +308,12 @@ public sealed class SAV4HGSS : SAV4
 
     // Pokeathlon
     public uint PokeathlonPoints { get => ReadUInt32LittleEndian(General[0xE548..]); set => WriteUInt32LittleEndian(General[0xE548..], value); }
+}
+
+public enum MapUnlockState4 : byte
+{
+    Johto = 0,
+    JohtoPlus = 1,
+    JohtoKanto = 2,
+    Invalid = 3,
 }

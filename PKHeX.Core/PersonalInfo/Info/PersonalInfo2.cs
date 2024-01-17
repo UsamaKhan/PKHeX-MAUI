@@ -5,12 +5,10 @@ namespace PKHeX.Core;
 /// <summary>
 /// <see cref="PersonalInfo"/> class with values from Generation 2 games.
 /// </summary>
-public sealed class PersonalInfo2 : PersonalInfo, IPersonalInfoTM, IPersonalInfoTutorType
+public sealed class PersonalInfo2(byte[] Data) : PersonalInfo, IPersonalInfoTM, IPersonalInfoTutorType
 {
     public const int SIZE = 0x20;
-    private readonly byte[] Data;
 
-    public PersonalInfo2(byte[] data) => Data = data;
     public override byte[] Write() => Data;
 
     public int DEX_ID { get => Data[0x00]; set => Data[0x00] = (byte)value; }
@@ -22,7 +20,7 @@ public sealed class PersonalInfo2 : PersonalInfo, IPersonalInfoTM, IPersonalInfo
     public override int SPD { get => Data[0x06]; set => Data[0x06] = (byte)value; }
     public override byte Type1 { get => Data[0x07]; set => Data[0x07] = value; }
     public override byte Type2 { get => Data[0x08]; set => Data[0x08] = value; }
-    public override int CatchRate { get => Data[0x09]; set => Data[0x09] = (byte)value; }
+    public override byte CatchRate { get => Data[0x09]; set => Data[0x09] = value; }
     public override int BaseEXP { get => Data[0x0A]; set => Data[0x0A] = (byte)value; }
     public int Item1 { get => Data[0xB]; set => Data[0xB] = (byte)value; }
     public int Item2 { get => Data[0xC]; set => Data[0xC] = (byte)value; }
@@ -104,8 +102,7 @@ public sealed class PersonalInfo2 : PersonalInfo, IPersonalInfoTM, IPersonalInfo
 
     public void SetIsLearnTutorType(int index, bool value)
     {
-        if ((uint)index >= TutorTypeCount)
-            throw new ArgumentOutOfRangeException(nameof(index), index, null);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual<uint>((uint)index, TutorTypeCount);
         index += CountTMHM;
         if (value)
             Data[TMHM + (index >> 3)] |= (byte)(1 << (index & 7));

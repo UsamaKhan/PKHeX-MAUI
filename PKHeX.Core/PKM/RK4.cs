@@ -10,10 +10,10 @@ namespace PKHeX.Core;
 /// </remarks>
 public sealed class RK4 : G4PKM
 {
-    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
-    {
+    public override ReadOnlySpan<ushort> ExtraBytes =>
+    [
         0x42, 0x43, 0x5E, 0x63, 0x64, 0x65, 0x66, 0x67, 0x87,
-    };
+    ];
 
     public override int SIZE_PARTY => PokeCrypto.SIZE_4RSTORED;
     public override int SIZE_STORED => PokeCrypto.SIZE_4RSTORED;
@@ -25,8 +25,8 @@ public sealed class RK4 : G4PKM
 
     private static byte[] Decrypt(byte[] data)
     {
-        byte[] pkData = data.Slice(0, PokeCrypto.SIZE_4STORED);
-        PokeCrypto.DecryptIfEncrypted45(ref pkData);
+        data = data[..PokeCrypto.SIZE_4RSTORED];
+        PokeCrypto.DecryptIfEncrypted45(ref data);
         return data;
     }
 
@@ -46,7 +46,7 @@ public sealed class RK4 : G4PKM
     public override uint EXP { get => ReadUInt32LittleEndian(Data.AsSpan(0x10)); set => WriteUInt32LittleEndian(Data.AsSpan(0x10), value); }
     public override int OT_Friendship { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public override int Ability { get => Data[0x15]; set => Data[0x15] = (byte)value; }
-    public override int MarkValue { get => Data[0x16]; set => Data[0x16] = (byte)value; }
+    public override byte MarkingValue { get => Data[0x16]; set => Data[0x16] = value; }
     public override int Language { get => Data[0x17]; set => Data[0x17] = (byte)value; }
     public override int EV_HP { get => Data[0x18]; set => Data[0x18] = (byte)value; }
     public override int EV_ATK { get => Data[0x19]; set => Data[0x19] = (byte)value; }
@@ -331,7 +331,7 @@ public sealed class RK4 : G4PKM
         RefreshChecksum();
 
         byte[] data = (byte[])Data.Clone();
-        byte[] pkData = data.Slice(0, PokeCrypto.SIZE_4STORED);
+        byte[] pkData = data[..PokeCrypto.SIZE_4STORED];
         pkData = PokeCrypto.EncryptArray45(pkData);
         pkData.CopyTo(data, 0);
         return data;

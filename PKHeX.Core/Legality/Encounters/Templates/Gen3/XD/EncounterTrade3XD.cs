@@ -36,7 +36,7 @@ public sealed record EncounterTrade3XD : IEncounterable, IEncounterMatch, IEncou
 
     private readonly string[] Nicknames;
 
-    public EncounterTrade3XD(ushort species, byte level, string[] trainer) : this(species, level, trainer, Array.Empty<string>()) { }
+    public EncounterTrade3XD(ushort species, byte level, string[] trainer) : this(species, level, trainer, []) { }
 
     public EncounterTrade3XD(ushort species, byte level, string[] trainer, string[] nicknames)
     {
@@ -83,7 +83,7 @@ public sealed record EncounterTrade3XD : IEncounterable, IEncounterMatch, IEncou
         if (Moves.HasMoves)
             pk.SetMoves(Moves);
         else
-            EncounterUtil1.SetEncounterMoves(pk, Version, Level);
+            EncounterUtil.SetEncounterMoves(pk, Version, Level);
 
         pk.ResetPartyStats();
         return pk;

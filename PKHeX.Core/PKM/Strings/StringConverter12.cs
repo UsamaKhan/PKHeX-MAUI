@@ -17,7 +17,7 @@ public static class StringConverter12
                 return false;
         }
         return true;
-        static bool IsJapanese(char c) => c is >= '\u3000' and <= '\u30FC'; // todo: bitmask check
+        static bool IsJapanese(char c) => c is >= '\u3000' and <= '\u30FC';
     }
 
     public static bool GetIsG1English(ReadOnlySpan<char> str) => !GetIsG1Japanese(str);
@@ -29,13 +29,14 @@ public static class StringConverter12
         foreach (var c in data)
         {
             var b = table[c];
-            if (b == G1Terminator && c is not (G1TerminatorCode or 0))
+            if (b == G1Terminator && c is not (G1TerminatorCode or G1TerminatorZero))
                 return false;
         }
         return true;
     }
 
     public const byte G1TerminatorCode = 0x50;
+    public const byte G1TerminatorZero = 0x00;
     public const char G1Terminator = '\0';
     public const byte G1TradeOTCode = 0x5D;
     public const char G1TradeOT = '*';
@@ -157,11 +158,9 @@ public static class StringConverter12
         int i = 0;
         for (; i < value.Length; i++)
         {
-            char c = value[i];
-            var index = dict.IndexOf(c);
-            if (index is -1 or G1TerminatorCode)
+            if (!TryGetIndex(dict, value[i], out var index))
                 break;
-            destBuffer[i] = (byte)index;
+            destBuffer[i] = index;
         }
 
         int count = i;
@@ -169,6 +168,34 @@ public static class StringConverter12
             return count;
         destBuffer[count] = G1TerminatorCode;
         return count + 1;
+    }
+
+    private static bool TryGetIndex(in ReadOnlySpan<char> dict, char c, out byte result)
+    {
+        var index = dict.IndexOf(c);
+        if (index == -1)
+            return TryGetUserFriendlyRemap(dict, c, out result);
+        // \0 shouldn't really be user-entered, but just in case
+        result = (byte)index;
+        return index != default;
+    }
+
+    // べ (U+3079), ぺ (U+307A), へ (U+3078), and り (U+308A)
+    private const string Hiragana = "べぺへり";
+
+    /// <summary>
+    /// Tries to remap the user input to a valid character.
+    /// </summary>
+    private static bool TryGetUserFriendlyRemap(in ReadOnlySpan<char> dict, char c, out byte result)
+    {
+        if (Hiragana.Contains(c))
+        {
+            int index = dict.IndexOf((char)(c + (char)0x60));
+            result = (byte)index;
+            return true; // Valid Hiragana will always be found if it's in the table
+        }
+        result = default;
+        return false;
     }
 
     #region Gen 1/2 Character Tables
@@ -181,10 +208,12 @@ public static class StringConverter12
     private const char LPO = '@'; // Po
     private const char LKE = '#'; // Ke
     private const char LEA = '%'; // é for Box
-    private const char DOT = '․'; // Not .
+    public const char DOT = '․'; // . for MR.MIME (U+2024, not U+002E)
+    private const char SPF = '　'; // Full-width space (U+3000)
+    public const char SPH = ' '; // Half-width space
 
-    public static ReadOnlySpan<char> TableEN => new[]
-    {
+    public static ReadOnlySpan<char> TableEN =>
+    [
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 00-0F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 10-1F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 20-2F
@@ -192,19 +221,19 @@ public static class StringConverter12
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 40-4F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, TOT, NUL, NUL, // 50-5F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 60-6F
-        LPO, LKE, '“', '”', NUL, '…', NUL, NUL, NUL, '┌', '─', '┐', '│', '└', '┘', ' ', // 70-7F
+        LPO, LKE, '“', '”', NUL, '…', NUL, NUL, NUL, '┌', '─', '┐', '│', '└', '┘', SPH, // 70-7F
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', // 80-8F
         'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '(', ')', ':', ';', '[', ']', // 90-9F
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', // A0-AF
         'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'à', 'è', 'é', 'ù', 'À', 'Á', // B0-BF
         'Ä', 'Ö', 'Ü', 'ä', 'ö', 'ü', 'È', 'É', 'Ì', 'Í', 'Ñ', 'Ò', 'Ó', 'Ù', 'Ú', 'á', // C0-CF
         'ì', 'í', 'ñ', 'ò', 'ó', 'ú', NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, '←', '\'', // D0-DF
-        '’', LPK, LMN, '-', NUL, NUL, '?', '!', '.', '&', LEA, '→', '▷', '▶', '▼', '♂', // E0-EF
-        MNY, '×', DOT, '/', ',', '♀', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // F0-FF
-    };
+        '’', LPK, LMN, '-', NUL, NUL, '?', '!', DOT, '&', LEA, '→', '▷', '▶', '▼', '♂', // E0-EF
+        MNY, '×', '.', '/', ',', '♀', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // F0-FF
+    ];
 
-    public static ReadOnlySpan<char> TableJP => new[]
-    {
+    public static ReadOnlySpan<char> TableJP =>
+    [
         NUL, NUL, NUL, NUL, NUL, 'ガ', 'ギ', 'グ', 'ゲ', 'ゴ', 'ザ', 'ジ', 'ズ', 'ゼ', 'ゾ', 'ダ', // 00-0F
         'ヂ', 'ヅ', 'デ', 'ド', NUL, NUL, NUL, NUL, NUL, 'バ', 'ビ', 'ブ', 'ボ', NUL,  NUL, NUL, // 10-1F
         NUL, NUL, NUL, NUL, NUL, NUL, 'が', 'ぎ', 'ぐ', 'げ', 'ご', 'ざ', 'じ', 'ず', 'ぜ', 'ぞ', // 20-2F
@@ -212,16 +241,16 @@ public static class StringConverter12
         'パ', 'ピ', 'プ', 'ポ', 'ぱ', 'ぴ', 'ぷ', 'ペ', 'ぽ', NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 40-4F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, TOT, NUL, NUL, // 50-5F
         NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, // 60-6F
-        '「', '」', '『', '』', '・', '⋯', NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, '　', // 70-7F
+        '「', '」', '『', '』', '・', '⋯', NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, NUL, SPF, // 70-7F
         'ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ', 'サ', 'シ', 'ス', 'セ', 'ソ', 'タ', // 80-8F
         'チ', 'ツ', 'テ', 'ト', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ', 'ハ', 'ヒ', 'フ', 'ホ', 'マ', 'ミ', 'ム', // 90-9F
         'メ', 'モ', 'ヤ', 'ユ', 'ヨ', 'ラ', 'ル', 'レ', 'ロ', 'ワ', 'ヲ', 'ン', 'ッ', 'ャ', 'ュ', 'ョ', // A0-AF
         'ィ', 'あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', // B0-BF
-        'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', // C0-CF
+        'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'ヘ', 'ほ', 'ま', // C0-CF
         'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'リ', 'る', 'れ', 'ろ', 'わ', 'を', 'ん', 'っ', // D0-DF
         'ゃ', 'ゅ', 'ょ', 'ー', 'ﾟ', 'ﾞ', '？', '！', '。', 'ァ', 'ゥ', 'ェ', NUL, NUL, NUL, '♂', // E0-EF
         MNY, NUL, '．', '／', 'ォ', '♀', '０', '１', '２', '３', '４', '５', '６', '７', '８', '９', // F0-FF
-    };
+    ];
 
     #endregion
 }

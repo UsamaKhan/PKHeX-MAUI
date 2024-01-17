@@ -5,10 +5,10 @@ using static System.Buffers.Binary.BinaryPrimitives;
 namespace PKHeX.Core;
 
 /// <summary> Generation 7 <see cref="PKM"/> format used for <see cref="GameVersion.GG"/>. </summary>
-public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, ICombatPower, IFavorite, IFormArgument
+public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, ICombatPower, IFavorite, IFormArgument, IAppliedMarkings7
 {
-    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
-    {
+    public override ReadOnlySpan<ushort> ExtraBytes =>
+    [
         0x2A, // Old Marking Value (PelagoEventStatus)
         0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, // Unused Ribbons
         0x58, 0x59, // Nickname Terminator
@@ -18,7 +18,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         0xA7, 0xAA, 0xAB,
         0xAC, 0xAD, // Fatigue, no GUI editing
         0xC8, 0xC9, // OT Terminator
-    };
+    ];
 
     public override int SIZE_PARTY => SIZE;
     public override int SIZE_STORED => SIZE;
@@ -98,7 +98,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     public override int Ability { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public override int AbilityNumber { get => Data[0x15] & 7; set => Data[0x15] = (byte)((Data[0x15] & ~7) | (value & 7)); }
     public bool IsFavorite { get => (Data[0x15] & 8) != 0; set => Data[0x15] = (byte)((Data[0x15] & ~8) | ((value ? 1 : 0) << 3)); }
-    public override int MarkValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(0x16), (ushort)value); }
+    public ushort MarkingValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(0x16), value); }
 
     public override uint PID
     {
@@ -309,22 +309,29 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     // 102/103 unused
     #endregion
 
-    public override int MarkingCount => 6;
+    public int MarkingCount => 6;
 
-    public override int GetMarking(int index)
+    public MarkingColor GetMarking(int index)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
-        return (MarkValue >> (index * 2)) & 3;
+        return (MarkingColor)((MarkingValue >> (index * 2)) & 3);
     }
 
-    public override void SetMarking(int index, int value)
+    public void SetMarking(int index, MarkingColor value)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
         var shift = index * 2;
-        MarkValue = (MarkValue & ~(0b11 << shift)) | ((value & 3) << shift);
+        MarkingValue = (ushort)((MarkingValue & ~(0b11 << shift)) | (((byte)value & 3) << shift));
     }
+
+    public MarkingColor MarkingCircle   { get => GetMarking(0); set => SetMarking(0, value); }
+    public MarkingColor MarkingTriangle { get => GetMarking(1); set => SetMarking(1, value); }
+    public MarkingColor MarkingSquare   { get => GetMarking(2); set => SetMarking(2, value); }
+    public MarkingColor MarkingHeart    { get => GetMarking(3); set => SetMarking(3, value); }
+    public MarkingColor MarkingStar     { get => GetMarking(4); set => SetMarking(4, value); }
+    public MarkingColor MarkingDiamond  { get => GetMarking(5); set => SetMarking(5, value); }
 
     protected override bool TradeOT(ITrainerInfo tr)
     {
@@ -396,51 +403,8 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
     private static int GetStat(int baseStat, int iv, int level, int nature, int statIndex)
     {
         int initial = GetStat(baseStat, iv, level) + 5;
-        return AmplifyStat(nature, statIndex, initial);
+        return NatureAmp.AmplifyStat(nature, statIndex, initial);
     }
-
-    private static int AmplifyStat(int nature, int index, int initial) => GetNatureAmp(nature, index) switch
-    {
-        1 => 110 * initial / 100, // 110%
-        -1 => 90 * initial / 100, // 90%
-        _ => initial,
-    };
-
-    private static sbyte GetNatureAmp(int nature, int index)
-    {
-        if ((uint)nature >= 25)
-            return -1;
-        return NatureAmpTable[(5 * nature) + index];
-    }
-
-    private static ReadOnlySpan<sbyte> NatureAmpTable => new sbyte[]
-    {
-        0, 0, 0, 0, 0, // Hardy
-        1,-1, 0, 0, 0, // Lonely
-        1, 0, 0, 0,-1, // Brave
-        1, 0,-1, 0, 0, // Adamant
-        1, 0, 0,-1, 0, // Naughty
-       -1, 1, 0, 0, 0, // Bold
-        0, 0, 0, 0, 0, // Docile
-        0, 1, 0, 0,-1, // Relaxed
-        0, 1,-1, 0, 0, // Impish
-        0, 1, 0,-1, 0, // Lax
-       -1, 0, 0, 0, 1, // Timid
-        0,-1, 0, 0, 1, // Hasty
-        0, 0, 0, 0, 0, // Serious
-        0, 0,-1, 0, 1, // Jolly
-        0, 0, 0,-1, 1, // Naive
-       -1, 0, 1, 0, 0, // Modest
-        0,-1, 1, 0, 0, // Mild
-        0, 0, 1, 0,-1, // Quiet
-        0, 0, 0, 0, 0, // Bashful
-        0, 0, 1,-1, 0, // Rash
-       -1, 0, 0, 1, 0, // Calm
-        0,-1, 0, 1, 0, // Gentle
-        0, 0, 0, 1,-1, // Sassy
-        0, 0,-1, 1, 0, // Careful
-        0, 0, 0, 0, 0, // Quirky
-    };
 
     public int CalcCP => Math.Min(10000, AwakeCP + BaseCP);
 
@@ -565,7 +529,9 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         result *= 255f;
         int value = (int)result;
         int unsigned = value & ~(value >> 31);
-        return (byte)Math.Min(255, unsigned);
+        if (unsigned > 255)
+            unsigned = 255;
+        return (byte)unsigned;
     }
 
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
@@ -582,7 +548,9 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
         result *= 255f;
         int value = (int)result;
         int unsigned = value & ~(value >> 31);
-        return (byte)Math.Min(255, unsigned);
+        if (unsigned > 255)
+            unsigned = 255;
+        return (byte)unsigned;
     }
 
     public static int GetRandomIndex(int bits, int characterIndex, int nature)
@@ -591,7 +559,7 @@ public sealed class PB7 : G6PKM, IHyperTrain, IAwakened, IScaledSizeValue, IComb
             return GetRandomIndex(characterIndex);
         if (bits is 0)
             return 0;
-        var amps = NatureAmpTable.Slice(5 * nature, 5);
+        var amps = NatureAmp.GetAmps(nature);
         if (amps[bits - 1] != -1) // not a negative stat
             return bits;
 

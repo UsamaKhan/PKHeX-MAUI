@@ -30,9 +30,11 @@ public sealed class SAV4DP : SAV4Sinnoh
 
     public const int GeneralSize = 0xC100;
     private const int StorageSize = 0x121E0; // Start 0xC100, +4 starts box data
-    protected override BlockInfo4[] ExtraBlocks => new[] {
+
+    protected override BlockInfo4[] ExtraBlocks =>
+    [
         new BlockInfo4(0, 0x20000, 0x2AC0), // Hall of Fame
-    };
+    ];
 
     private void Initialize()
     {
@@ -42,6 +44,7 @@ public sealed class SAV4DP : SAV4Sinnoh
 
     protected override int EventWork => 0xD9C;
     protected override int EventFlag => 0xFDC;
+    public override BattleFrontierFacility4 MaxFacility => BattleFrontierFacility4.Tower;
 
     private void GetSAVOffsets()
     {
@@ -49,6 +52,7 @@ public sealed class SAV4DP : SAV4Sinnoh
         Trainer1 = 0x64;
         Party = 0x98;
         PokeDex = 0x12DC;
+        ChatterOffset = 0x61CC;
         Geonet = 0x96D8;
         WondercardFlags = 0xA6D0;
         WondercardData = 0xA7fC;
@@ -89,7 +93,7 @@ public sealed class SAV4DP : SAV4Sinnoh
         {
             var info = ItemStorage4DP.Instance;
             InventoryPouch[] pouch =
-            {
+            [
                 new InventoryPouch4(InventoryType.Items, info, 999, 0x624),
                 new InventoryPouch4(InventoryType.KeyItems, info, 1, 0x8B8),
                 new InventoryPouch4(InventoryType.TMHMs, info, 99, 0x980),
@@ -98,7 +102,7 @@ public sealed class SAV4DP : SAV4Sinnoh
                 new InventoryPouch4(InventoryType.Berries, info, 999, 0xBE0),
                 new InventoryPouch4(InventoryType.Balls, info, 999, 0xCE0),
                 new InventoryPouch4(InventoryType.BattleItems, info, 999, 0xD1C),
-            };
+            ];
             return pouch.LoadAll(General);
         }
         set => value.SaveAll(General);
@@ -162,14 +166,15 @@ public sealed class SAV4DP : SAV4Sinnoh
     public override uint SafariSeed { get => ReadUInt32LittleEndian(General[0x53C4..]); set => WriteUInt32LittleEndian(General[0x53C4..], value); }
     public override uint SwarmSeed { get => ReadUInt32LittleEndian(General[0x53C8..]); set => WriteUInt32LittleEndian(General[0x53C8..], value); }
     public override uint SwarmMaxCountModulo => 28;
+    public override int BP { get => ReadUInt16LittleEndian(General[0x65F8..]); set => WriteUInt16LittleEndian(General[0x65F8..], (ushort)value); }
 
-    protected override ReadOnlySpan<ushort> TreeSpecies =>new ushort[]
-    {
+    protected override ReadOnlySpan<ushort> TreeSpecies =>
+    [
         000, 000, 000, 000, 000, 000,
         265, 266, 415, 412, 420, 190,
         415, 412, 420, 190, 214, 265,
         446, 446, 446, 446, 446, 446,
-    };
+    ];
 
     public Roamer4 RoamerMesprit   => GetRoamer(0);
     public Roamer4 RoamerCresselia => GetRoamer(1);

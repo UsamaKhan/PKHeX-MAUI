@@ -73,7 +73,7 @@ public sealed record EncounterStatic5(GameVersion Version)
             pk.EggMetDate = pk.MetDate;
         }
 
-        EncounterUtil1.SetEncounterMoves(pk, version, LevelMin);
+        EncounterUtil.SetEncounterMoves(pk, version, LevelMin);
 
         SetPINGA(pk, criteria, pi);
         pk.ResetPartyStats();
@@ -148,7 +148,7 @@ public sealed record EncounterStatic5(GameVersion Version)
 
     private bool IsMatchPartial(PKM pk)
     {
-        // BW/2 Jellicent collision with wild surf slot, resolved by duplicating the encounter with any abil
+        // B2/W2 has a static encounter Jellicent with Hidden Ability. Collides with wild surf slots.
         if (Ability == AbilityPermission.OnlyHidden && pk.AbilityNumber != 4 && pk.Format <= 7)
             return true;
         if (EggLocation == Locations.Daycare5 && pk.RelearnMove1 != 0)

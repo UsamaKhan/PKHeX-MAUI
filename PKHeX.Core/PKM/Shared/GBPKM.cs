@@ -18,7 +18,7 @@ public abstract class GBPKM : PKM
     public sealed override int MaxIV => 15;
     public sealed override int MaxEV => EffortValues.Max12;
 
-    public sealed override ReadOnlySpan<ushort> ExtraBytes => ReadOnlySpan<ushort>.Empty;
+    public sealed override ReadOnlySpan<ushort> ExtraBytes => [];
 
     protected GBPKM([ConstantExpected] int size) : base(size) { }
     protected GBPKM(byte[] data) : base(data) { }
@@ -120,7 +120,6 @@ public abstract class GBPKM : PKM
     public sealed override uint TSV => 0x0000;
     public sealed override uint PSV => 0xFFFF;
     public sealed override int Characteristic => -1;
-    public sealed override int MarkValue { get => 0; set { } }
     public sealed override int Ability { get => -1; set { } }
     public sealed override int CurrentHandler { get => 0; set { } }
     public sealed override int Egg_Location { get => 0; set { } }
@@ -135,12 +134,9 @@ public abstract class GBPKM : PKM
 
     public sealed override int HPType
     {
-        get => ((IV_ATK & 3) << 2) | (IV_DEF & 3);
-        set
-        {
-            IV_DEF = ((IV_DEF >> 2) << 2) | (value & 3);
-            IV_DEF = ((IV_ATK >> 2) << 2) | ((value >> 2) & 3);
-        }
+        // Get and set values directly without multiple calls to DV16.
+        get => HiddenPower.GetTypeGB(DV16);
+        set => DV16 = HiddenPower.SetTypeGB(value, DV16);
     }
 
     public sealed override byte Form
@@ -184,9 +180,6 @@ public abstract class GBPKM : PKM
     public int IV_SPC { get => (DV16 >> 0) & 0xF; set => DV16 = (ushort)((DV16 & ~(0xF << 0)) | (ushort)((value > 0xF ? 0xF : value) << 0)); }
     public sealed override int IV_SPA { get => IV_SPC; set => IV_SPC = value; }
     public sealed override int IV_SPD { get => IV_SPC; set { } }
-    public override int MarkingCount => 0;
-    public override int GetMarking(int index) => 0;
-    public override void SetMarking(int index, int value) { }
 
     public void SetNotNicknamed() => SetNotNicknamed(GuessedLanguage());
     public abstract void SetNotNicknamed(int language);
@@ -228,10 +221,10 @@ public abstract class GBPKM : PKM
 
     protected static ushort GetStat(int baseStat, int iv, int effort, int level)
     {
-        // The games store a precomputed ushort[256] i*i table for all ushort->byte square root calcs.
+        // The games store a precomputed ushort[256] i^2 table for all ushort->byte square root calculations.
         // The game then iterates to find the lowest index with a value >= input (effort).
         // With modern CPUs we can just call sqrt->ceil directly.
-        // ceil(sqrt(65535)) evals to 256, but we're clamped to byte only.
+        // ceil(sqrt(65535)) evaluates to 256, but we're clamped to byte only.
         byte firstSquare = (byte)Math.Min(255, Math.Ceiling(Math.Sqrt(effort)));
 
         effort = firstSquare >> 2;

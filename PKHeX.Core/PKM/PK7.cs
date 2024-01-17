@@ -6,14 +6,14 @@ namespace PKHeX.Core;
 
 /// <summary> Generation 7 <see cref="PKM"/> format. </summary>
 public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetCommon3, IRibbonSetCommon4, IRibbonSetCommon6, IRibbonSetMemory6, IRibbonSetCommon7, IRibbonSetRibbons,
-    IContestStats, IHyperTrain, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection, IPokerusStatus
+    IContestStats, IHyperTrain, IGeoTrack, ISuperTrain, IFormArgument, ITrainerMemories, IAffection, IPokerusStatus, IAppliedMarkings7
 {
-    public override ReadOnlySpan<ushort> ExtraBytes => new ushort[]
-    {
+    public override ReadOnlySpan<ushort> ExtraBytes =>
+    [
         0x2A, // Old Marking Value (PelagoEventStatus)
         // 0x36, 0x37, // Unused Ribbons
         0x58, 0x59, 0x73, 0x90, 0x91, 0x9E, 0x9F, 0xA0, 0xA1, 0xA7, 0xAA, 0xAB, 0xAC, 0xAD, 0xC8, 0xC9, 0xD7, 0xE4, 0xE5, 0xE6, 0xE7,
-    };
+    ];
 
     public override EntityContext Context => EntityContext.Gen7;
     public override PersonalInfo7 PersonalInfo => PersonalTable.USUM.GetFormEntry(Species, Form);
@@ -88,7 +88,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
 
     public override int Ability { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public override int AbilityNumber { get => Data[0x15] & 7; set => Data[0x15] = (byte)((Data[0x15] & ~7) | (value & 7)); }
-    public override int MarkValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(0x16), (ushort)value); }
+    public ushort MarkingValue { get => ReadUInt16LittleEndian(Data.AsSpan(0x16)); set => WriteUInt16LittleEndian(Data.AsSpan(0x16), value); }
 
     public override uint PID
     {
@@ -241,8 +241,12 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
         get => StringConverter7.GetString(Nickname_Trash);
         set
         {
+            // For Pokémon with no nickname, and match their Chinese species name, we need to use the private codepoint range instead of unicode.
+            // Can't use the stored language as it might have been traded & evolved -> mismatch; Gen8+ will match the origin language, not Gen7 :(
             if (!IsNicknamed)
             {
+                // Detect the language of the species name.
+                // If the species name is the same for Traditional and Simplified Chinese, we prefer the saved language.
                 int lang = SpeciesName.GetSpeciesNameLanguage(Species, Language, value, 7);
                 if (lang is (int)LanguageID.ChineseS or (int)LanguageID.ChineseT)
                 {
@@ -419,22 +423,29 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
 
     public bool IsUntradedEvent6 => Geo1_Country == 0 && Geo1_Region == 0 && Met_Location / 10000 == 4 && Gen6;
 
-    public override int MarkingCount => 6;
+    public int MarkingCount => 6;
 
-    public override int GetMarking(int index)
+    public MarkingColor GetMarking(int index)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
-        return (MarkValue >> (index * 2)) & 3;
+        return (MarkingColor)((MarkingValue >> (index * 2)) & 3);
     }
 
-    public override void SetMarking(int index, int value)
+    public void SetMarking(int index, MarkingColor value)
     {
         if ((uint)index >= MarkingCount)
             throw new ArgumentOutOfRangeException(nameof(index));
         var shift = index * 2;
-        MarkValue = (MarkValue & ~(0b11 << shift)) | ((value & 3) << shift);
+        MarkingValue = (ushort)((MarkingValue & ~(0b11 << shift)) | (((byte)value & 3) << shift));
     }
+
+    public MarkingColor MarkingCircle   { get => GetMarking(0); set => SetMarking(0, value); }
+    public MarkingColor MarkingTriangle { get => GetMarking(1); set => SetMarking(1, value); }
+    public MarkingColor MarkingSquare   { get => GetMarking(2); set => SetMarking(2, value); }
+    public MarkingColor MarkingHeart    { get => GetMarking(3); set => SetMarking(3, value); }
+    public MarkingColor MarkingStar     { get => GetMarking(4); set => SetMarking(4, value); }
+    public MarkingColor MarkingDiamond  { get => GetMarking(5); set => SetMarking(5, value); }
 
     public void FixMemories()
     {
@@ -458,8 +469,8 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
 
         if (Generation < 7) // must be transferred via bank, and must have memories
         {
-            this.SetTradeMemoryHT6(true); // oh no, memories on gen7 pk
-            // georegions cleared on 6->7, no need to set
+            this.SetTradeMemoryHT6(true); // oh no, memories on Gen7 pk
+            // geolocations cleared on 6->7, no need to set
         }
     }
 
@@ -501,7 +512,7 @@ public sealed class PK7 : G6PKM, IRibbonSetEvent3, IRibbonSetEvent4, IRibbonSetC
 
     internal void SetTransferLocale(int lang)
     {
-        this.SetTradeMemoryHT6(bank: true); // oh no, memories on gen7 pk
+        this.SetTradeMemoryHT6(bank: true); // oh no, memories on Gen7 pk
         RecentTrainerCache.SetConsoleRegionData3DS(this);
         RecentTrainerCache.SetFirstCountryRegion(this);
         if (lang == 1 && Country != 1) // Japan Only

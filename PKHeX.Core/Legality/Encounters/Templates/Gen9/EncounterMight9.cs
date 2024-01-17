@@ -273,6 +273,7 @@ public sealed record EncounterMight9
             Nickname = SpeciesName.GetSpeciesNameGeneration(Species, lang, Generation),
             Obedience_Level = LevelMin,
             RibbonMarkMightiest = true,
+            AffixedRibbon = (sbyte)RibbonIndex.MarkMightiest,
             OT_Name = tr.OT,
             OT_Gender = tr.Gender,
             ID32 = tr.ID32,
@@ -340,9 +341,9 @@ public sealed record EncounterMight9
         return IsMatchDeferred(pk);
     }
 
-    private bool IsMatchLocationExact(PKM pk) => pk.Met_Location == Location;
+    private static bool IsMatchLocationExact(PKM pk) => pk.Met_Location == Location;
 
-    private bool IsMatchLocationRemapped(PKM pk)
+    private static bool IsMatchLocationRemapped(PKM pk)
     {
         var met = (ushort)pk.Met_Location;
         var version = pk.Version;

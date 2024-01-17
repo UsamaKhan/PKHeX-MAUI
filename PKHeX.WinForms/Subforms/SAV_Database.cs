@@ -57,7 +57,7 @@ public partial class SAV_Database : Form
         var hdelta = newHeight - smallHeight;
         if (hdelta != 0)
             Height += hdelta;
-        PKXBOXES = grid.Entries.ToArray();
+        PKXBOXES = [.. grid.Entries];
 
         // Enable Scrolling when hovered over
         foreach (var slot in PKXBOXES)
@@ -77,7 +77,11 @@ public partial class SAV_Database : Form
 
             slot.ContextMenuStrip = mnu;
             if (Main.Settings.Hover.HoverSlotShowText)
+            {
+                slot.MouseMove += (o, args) => ShowSet.UpdatePreviewPosition(args.Location);
                 slot.MouseEnter += (o, args) => ShowHoverTextForSlot(slot, args);
+                slot.MouseLeave += (o, args) => ShowSet.Clear();
+            }
             slot.Enter += (sender, e) =>
             {
                 if (sender is not PictureBox pb)
@@ -121,12 +125,13 @@ public partial class SAV_Database : Form
         };
         CB_Format.Items[0] = MsgAny;
         CenterToParent();
+        Closing += (sender, e) => ShowSet.Clear();
     }
 
     private readonly PictureBox[] PKXBOXES;
     private readonly string DatabasePath = Main.DatabasePath;
-    private List<SlotCache> Results = new();
-    private List<SlotCache> RawDB = new();
+    private List<SlotCache> Results = [];
+    private List<SlotCache> RawDB = [];
     private int slotSelected = -1; // = null;
     private Image? slotColor;
     private const int RES_MAX = 66;
@@ -280,13 +285,12 @@ public partial class SAV_Database : Form
         versions.RemoveAt(versions.Count - 1); // None
         CB_GameOrigin.DataSource = versions;
 
-        string[] hptypes = new string[GameInfo.Strings.types.Length - 2];
-        Array.Copy(GameInfo.Strings.types, 1, hptypes, 0, hptypes.Length);
+        var hptypes = GameInfo.Strings.types.AsSpan(1, HiddenPower.TypeCount);
         var types = Util.GetCBList(hptypes);
         types.Insert(0, comboAny);
         CB_HPType.DataSource = types;
 
-        // Set the Move ComboBoxes too..
+        // Set the Move ComboBoxes too.
         var moves = new List<ComboItem>(GameInfo.MoveDataSource);
         moves.RemoveAt(0);
         moves.Insert(0, comboAny);
@@ -343,16 +347,10 @@ public partial class SAV_Database : Form
         reportGrid.PopulateData(Results);
     }
 
-    private sealed class SearchFolderDetail
+    private sealed class SearchFolderDetail(string path, bool ignoreBackupFiles)
     {
-        public string Path { get; }
-        public bool IgnoreBackupFiles { get; }
-
-        public SearchFolderDetail(string path, bool ignoreBackupFiles)
-        {
-            Path = path;
-            IgnoreBackupFiles = ignoreBackupFiles;
-        }
+        public string Path { get; } = path;
+        public bool IgnoreBackupFiles { get; } = ignoreBackupFiles;
     }
 
     private void LoadDatabase()
@@ -404,18 +402,9 @@ public partial class SAV_Database : Form
 
         if (Main.Settings.EntityDb.FilterUnavailableSpecies)
         {
-            static bool IsPresentInGameSV(ISpeciesForm pk) => pk is PK9 || PersonalTable.SV.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGameSWSH(ISpeciesForm pk) => pk is PK8 || PersonalTable.SWSH.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGameBDSP(ISpeciesForm pk) => pk is PB8 || PersonalTable.BDSP.IsPresentInGame(pk.Species, pk.Form);
-            static bool IsPresentInGamePLA(ISpeciesForm pk) => pk is PA8 || PersonalTable.LA.IsPresentInGame(pk.Species, pk.Form);
-            if (sav is SAV9SV)
-                result.RemoveAll(z => !IsPresentInGameSV(z.Entity));
-            else if (sav is SAV8SWSH)
-                result.RemoveAll(z => !IsPresentInGameSWSH(z.Entity));
-            else if (sav is SAV8BS)
-                result.RemoveAll(z => !IsPresentInGameBDSP(z.Entity));
-            else if (sav is SAV8LA)
-                result.RemoveAll(z => !IsPresentInGamePLA(z.Entity));
+            var filter = GetFilterForSaveFile(sav);
+            if (filter != null)
+                result.RemoveAll(z => !filter(z.Entity));
         }
 
         var sort = Main.Settings.EntityDb.InitialSortMode;
@@ -427,6 +416,15 @@ public partial class SAV_Database : Form
         // Finalize the Database
         return result;
     }
+
+    private static Func<PKM, bool>? GetFilterForSaveFile(SaveFile sav) => sav switch
+    {
+        SAV8SWSH => static pk => pk is PK8 || PersonalTable.SWSH.IsPresentInGame(pk.Species, pk.Form),
+        SAV8BS   => static pk => pk is PB8 || PersonalTable.BDSP.IsPresentInGame(pk.Species, pk.Form),
+        SAV8LA   => static pk => pk is PA8 || PersonalTable.LA.IsPresentInGame(pk.Species, pk.Form),
+        SAV9SV   => static pk => pk is PK9 || PersonalTable.SV.IsPresentInGame(pk.Species, pk.Form),
+        _ => null,
+    };
 
     private static void TryAddPKMsFromSaveFilePath(ConcurrentBag<SlotCache> dbTemp, string file)
     {
@@ -615,8 +613,10 @@ public partial class SAV_Database : Form
 
     private void UpdateScroll(object sender, ScrollEventArgs e)
     {
-        if (e.OldValue != e.NewValue)
-            FillPKXBoxes(e.NewValue);
+        if (e.OldValue == e.NewValue)
+            return;
+        FillPKXBoxes(e.NewValue);
+        ShowSet.Clear();
     }
 
     private void SetResults(List<SlotCache> res)
@@ -688,8 +688,10 @@ public partial class SAV_Database : Form
             return;
         int oldval = SCR_Box.Value;
         int newval = oldval + (e.Delta < 0 ? 1 : -1);
-        if (newval >= SCR_Box.Minimum && SCR_Box.Maximum >= newval)
-            FillPKXBoxes(SCR_Box.Value = newval);
+        if (newval < SCR_Box.Minimum || SCR_Box.Maximum < newval)
+            return;
+        FillPKXBoxes(SCR_Box.Value = newval);
+        ShowSet.Clear();
     }
 
     private void ChangeFormatFilter(object sender, EventArgs e)

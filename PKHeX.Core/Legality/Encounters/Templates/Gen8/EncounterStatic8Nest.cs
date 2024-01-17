@@ -81,7 +81,7 @@ public abstract record EncounterStatic8Nest<T>(GameVersion Version)
         if (Moves.HasMoves)
             pk.SetMoves(Moves);
         else
-            EncounterUtil1.SetEncounterMoves(pk, version, Level);
+            EncounterUtil.SetEncounterMoves(pk, version, Level);
         pk.ResetPartyStats();
 
         return pk;
@@ -133,16 +133,12 @@ public abstract record EncounterStatic8Nest<T>(GameVersion Version)
         if (pk is PK8 d && d.DynamaxLevel < DynamaxLevel)
             return false;
 
-        // Required Ability
-        if (Ability == OnlyHidden && pk.AbilityNumber != 4)
-            return false; // H
-
         if (Version != GameVersion.SWSH && pk.Version != (int)Version && pk.Met_Location != SharedNest)
             return false;
 
         if (pk is IRibbonSetMark8 { HasMarkEncounter8: true })
             return false;
-        if (pk.Species == (int)Core.Species.Shedinja && pk is IRibbonSetAffixed { AffixedRibbon: >= (int)RibbonIndex.MarkLunchtime and <= (int)RibbonIndex.MarkSlump })
+        if (pk.Species == (int)Core.Species.Shedinja && pk is IRibbonSetAffixed x && ((RibbonIndex)x.AffixedRibbon).IsEncounterMark8())
             return false;
 
         if (!IsMatchEggLocation(pk))
@@ -202,6 +198,8 @@ public abstract record EncounterStatic8Nest<T>(GameVersion Version)
             else if (Ability.IsSingleValue(out int index) && 1 << index != num) // Fixed regular ability
             {
                 if (Ability is OnlyFirst or OnlySecond && !AbilityVerifier.CanAbilityCapsule(8, PersonalTable.SWSH.GetFormEntry(Species, Form)))
+                    return EncounterMatchRating.DeferredErrors;
+                if (Ability is OnlyHidden) // Can't revert to hidden ability even if transferred from HOME and another game with HA reversion.
                     return EncounterMatchRating.DeferredErrors;
             }
         }

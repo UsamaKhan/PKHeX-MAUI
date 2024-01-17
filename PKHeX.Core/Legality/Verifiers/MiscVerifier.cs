@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using static PKHeX.Core.LegalityCheckStrings;
 using static PKHeX.Core.CheckIdentifier;
@@ -176,6 +175,11 @@ public sealed class MiscVerifier : Verifier
             if (pk9.TeraTypeOverride != (MoveType)TeraTypeUtil.OverrideNone)
                 data.AddLine(GetInvalid(LTeraTypeIncorrect));
         }
+        else if (pk9.Species == (int)Species.Terapagos)
+        {
+            if (!TeraTypeUtil.IsValidTerapagos((byte)pk9.TeraTypeOverride))
+                data.AddLine(GetInvalid(LTeraTypeIncorrect));
+        }
         else if (pk9.Species == (int)Species.Ogerpon)
         {
             if (!TeraTypeUtil.IsValidOgerpon((byte)pk9.TeraTypeOverride, pk9.Form))
@@ -224,8 +228,15 @@ public sealed class MiscVerifier : Verifier
         {
             if (enc is { Species: (int)Species.Larvesta, Form: 0 } and not EncounterEgg)
                 DisallowLevelUpMove(24, (ushort)Move.BugBite, pk9, data);
-            if (enc is { Species: (int)Species.Zorua, Form: 1 } and not EncounterEgg)
+            else if (enc is { Species: (int)Species.Zorua, Form: 1 } and not EncounterEgg)
                 DisallowLevelUpMove(28, (ushort)Move.Spite, pk9, data);
+            else
+                return;
+
+            // Safari and Sport are not obtainable in the base game.
+            // For the learnset restricted cases, we need to check if the ball is available too.
+            if (((BallUseLegality.WildPokeballs9PreDLC2 >> pk9.Ball) & 1) != 1)
+                data.AddLine(GetInvalid(LBallUnavailable));
         }
     }
 
@@ -241,8 +252,7 @@ public sealed class MiscVerifier : Verifier
         if (m.Info.Method != LearnMethod.LevelUp || m.Info.Argument != level)
             return;
         var flagIndex = pk.Permit.RecordPermitIndexes.IndexOf(move);
-        if (flagIndex == -1)
-            throw new ArgumentOutOfRangeException(nameof(move), move, "Expected a valid TM index.");
+        ArgumentOutOfRangeException.ThrowIfNegative(flagIndex, nameof(move)); // Always expect it to match.
         if (pk.GetMoveRecordFlag(flagIndex))
             return;
         m = new MoveResult(LearnMethod.None);
@@ -360,48 +370,45 @@ public sealed class MiscVerifier : Verifier
 
     private void VerifyMiscG1CatchRate(LegalityAnalysis data, PK1 pk1)
     {
-        var catch_rate = pk1.Catch_Rate;
         var tradeback = GBRestrictions.IsTimeCapsuleTransferred(pk1, data.Info.Moves, data.EncounterMatch);
         var result = tradeback is TimeCapsuleEvaluation.NotTransferred or TimeCapsuleEvaluation.BadCatchRate
-            ? GetWasNotTradeback(tradeback)
-            : GetWasTradeback(tradeback);
+            ? GetWasNotTradeback(data, pk1, tradeback)
+            : GetWasTradeback(data, pk1, tradeback);
         data.AddLine(result);
+    }
 
-        CheckResult GetWasTradeback(TimeCapsuleEvaluation timeCapsuleEvalution)
+    private CheckResult GetWasTradeback(LegalityAnalysis data, PK1 pk1, TimeCapsuleEvaluation eval)
+    {
+        var rate = pk1.CatchRate;
+        if (PK1.IsCatchRateHeldItem(rate))
+            return GetValid(LG1CatchRateMatchTradeback);
+        return GetWasNotTradeback(data, pk1, eval);
+    }
+
+    private CheckResult GetWasNotTradeback(LegalityAnalysis data, PK1 pk1, TimeCapsuleEvaluation eval)
+    {
+        var rate = pk1.CatchRate;
+        if (MoveInfo.IsAnyFromGeneration(2, data.Info.Moves))
+            return GetInvalid(LG1CatchRateItem);
+        var e = data.EncounterMatch;
+        if (e is EncounterGift1 { Version: GameVersion.Stadium } or EncounterTrade1)
+            return GetValid(LG1CatchRateMatchPrevious); // Encounters detected by the catch rate, cant be invalid if match this encounters
+
+        ushort species = pk1.Species;
+        if (GBRestrictions.IsSpeciesNotAvailableCatchRate((byte)species) && rate == PersonalTable.RB[species].CatchRate)
         {
-            if (PK1.IsCatchRateHeldItem(catch_rate))
-                return GetValid(LG1CatchRateMatchTradeback);
-            if (timeCapsuleEvalution == TimeCapsuleEvaluation.BadCatchRate)
-                return GetInvalid(LG1CatchRateItem);
-
-            return GetWasNotTradeback(timeCapsuleEvalution);
+            if (species != (int)Species.Dragonite || rate != 45 || !(e.Version == GameVersion.BU || e.Version.Contains(GameVersion.YW)))
+                return GetInvalid(LG1CatchRateEvo);
         }
-
-        CheckResult GetWasNotTradeback(TimeCapsuleEvaluation timeCapsuleEvalution)
-        {
-            if (MoveInfo.IsAnyFromGeneration(2, data.Info.Moves))
-                return GetInvalid(LG1CatchRateItem);
-            var e = data.EncounterMatch;
-            if (e is EncounterGift1 {Version: GameVersion.Stadium} or EncounterTrade1)
-                return GetValid(LG1CatchRateMatchPrevious); // Encounters detected by the catch rate, cant be invalid if match this encounters
-
-            ushort species = pk1.Species;
-            if (GBRestrictions.IsSpeciesNotAvailableCatchRate((byte)species) && catch_rate == PersonalTable.RB[species].CatchRate)
-            {
-                if (species != (int) Species.Dragonite || catch_rate != 45 || !(e.Version == GameVersion.BU || e.Version.Contains(GameVersion.YW)))
-                    return GetInvalid(LG1CatchRateEvo);
-            }
-            if (!GBRestrictions.RateMatchesEncounter(e.Species, e.Version, catch_rate))
-                return GetInvalid(timeCapsuleEvalution == TimeCapsuleEvaluation.Transferred12 ? LG1CatchRateChain : LG1CatchRateNone);
-            return GetValid(LG1CatchRateMatchPrevious);
-        }
+        if (!GBRestrictions.RateMatchesEncounter(e.Species, e.Version, rate))
+            return GetInvalid(eval == TimeCapsuleEvaluation.Transferred12 ? LG1CatchRateChain : LG1CatchRateNone);
+        return GetValid(LG1CatchRateMatchPrevious);
     }
 
     private static void VerifyMiscFatefulEncounter(LegalityAnalysis data)
     {
         var pk = data.Entity;
-        var enc = data.EncounterMatch;
-        switch (enc)
+        switch (data.EncounterMatch)
         {
             case WC3 {FatefulEncounter: true} w:
                 if (w.IsEgg)
@@ -410,7 +417,7 @@ public sealed class MiscVerifier : Verifier
                     // Hatching in Gen3 doesn't change the origin version.
                     if (pk.Format != 3)
                         return; // possible hatched in either game, don't bother checking
-                    if (pk.Met_Location <= 087) // hatched in RS or Emerald
+                    if (Locations.IsMetLocation3RS((ushort)pk.Met_Location)) // hatched in RS or Emerald
                         return; // possible hatched in either game, don't bother checking
                     // else, ensure fateful is active (via below)
                 }
@@ -474,7 +481,7 @@ public sealed class MiscVerifier : Verifier
     private static void VerifyMiscEggCommon(LegalityAnalysis data)
     {
         var pk = data.Entity;
-        if (pk.Move1_PPUps > 0 || pk.Move2_PPUps > 0 || pk.Move3_PPUps > 0 || pk.Move4_PPUps > 0)
+        if (pk.Move1_PPUps != 0 || pk.Move2_PPUps != 0 || pk.Move3_PPUps != 0 || pk.Move4_PPUps != 0)
             data.AddLine(GetInvalid(LEggPPUp, Egg));
         if (!IsZeroMovePP(pk))
             data.AddLine(GetInvalid(LEggPP, Egg));
@@ -641,20 +648,18 @@ public sealed class MiscVerifier : Verifier
         if (pk.Species != data.EncounterMatch.Species)
             return; // evolved
 
-        if (Unfeedable.Contains(pk.Species))
+        if (IsUnfeedable(pk.Species))
             data.AddLine(GetInvalid(string.Format(LMemoryStatFullness, "0"), Encounter));
     }
 
-    private static readonly HashSet<ushort> Unfeedable = new()
-    {
-        (int)Species.Metapod,
-        (int)Species.Kakuna,
-        (int)Species.Pineco,
-        (int)Species.Silcoon,
-        (int)Species.Cascoon,
-        (int)Species.Shedinja,
-        (int)Species.Spewpa,
-    };
+    public static bool IsUnfeedable(ushort species) => species is
+        (int)Species.Metapod or
+        (int)Species.Kakuna or
+        (int)Species.Pineco or
+        (int)Species.Silcoon or
+        (int)Species.Cascoon or
+        (int)Species.Shedinja or
+        (int)Species.Spewpa;
 
     private static void VerifyBelugaStats(LegalityAnalysis data, PB7 pb7)
     {
@@ -827,7 +832,7 @@ public sealed class MiscVerifier : Verifier
                     continue;
 
                 // Calyrex-0 can have TR flags for Calyrex-1/2 after it has force unlearned them.
-                // Re-fusing can be reacquire the move via relearner, rather than needing another TR.
+                // Re-fusing can reacquire the move via relearner, rather than needing another TR.
                 // Calyrex-0 cannot reacquire the move via relearner, even though the TR is checked off in the TR list.
                 if (pk.Species == (int)Species.Calyrex)
                 {

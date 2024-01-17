@@ -21,7 +21,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public abstract int SIZE_STORED { get; }
     public string Extension => GetType().Name.ToLowerInvariant();
     public abstract PersonalInfo PersonalInfo { get; }
-    public virtual ReadOnlySpan<ushort> ExtraBytes => Array.Empty<ushort>();
+    public virtual ReadOnlySpan<ushort> ExtraBytes => [];
 
     // Internal Attributes set on creation
     public readonly byte[] Data; // Raw Storage
@@ -42,7 +42,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     // Trash Bytes
     public abstract Span<byte> Nickname_Trash { get; }
     public abstract Span<byte> OT_Trash { get; }
-    public virtual Span<byte> HT_Trash => Span<byte>.Empty;
+    public virtual Span<byte> HT_Trash => [];
 
     protected abstract byte[] Encrypt();
     public abstract EntityContext Context { get; }
@@ -131,7 +131,6 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public abstract uint TSV { get; }
     public abstract uint PSV { get; }
     public abstract int Characteristic { get; }
-    public abstract int MarkValue { get; set; }
     public abstract int Met_Location { get; set; }
     public abstract int Egg_Location { get; set; }
     public abstract int OT_Friendship { get; set; }
@@ -357,7 +356,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
 
     public int[] IVs
     {
-        get => new[] { IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD };
+        get => [IV_HP, IV_ATK, IV_DEF, IV_SPE, IV_SPA, IV_SPD];
         set => SetIVs(value);
     }
 
@@ -427,7 +426,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
 
     public int[] Stats
     {
-        get => new[] { Stat_HPCurrent, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD };
+        get => [Stat_HPCurrent, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD];
         set
         {
             if (value.Length != 6)
@@ -439,7 +438,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
 
     public ushort[] Moves
     {
-        get => new[] { Move1, Move2, Move3, Move4 };
+        get => [Move1, Move2, Move3, Move4];
         set => SetMoves(value);
     }
 
@@ -490,7 +489,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
 
     public ushort[] RelearnMoves
     {
-        get => new[] { RelearnMove1, RelearnMove2, RelearnMove3, RelearnMove4 };
+        get => [RelearnMove1, RelearnMove2, RelearnMove3, RelearnMove4];
         set => SetRelearnMoves(value);
     }
 
@@ -522,10 +521,6 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
             return (int)((Gen5 ? PID >> 16 : PID) & 1);
         }
     }
-
-    public abstract int MarkingCount { get; }
-    public abstract int GetMarking(int index);
-    public abstract void SetMarking(int index, int value);
 
     private int HPBitValPower => ((IV_HP & 2) >> 1) | ((IV_ATK & 2) >> 0) | ((IV_DEF & 2) << 1) | ((IV_SPE & 2) << 2) | ((IV_SPA & 2) << 3) | ((IV_SPD & 2) << 4);
     public virtual int HPPower => Format < 6 ? ((40 * HPBitValPower) / 63) + 30 : 60;
@@ -658,7 +653,7 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public virtual void RefreshAbility(int n)
     {
         AbilityNumber = 1 << n;
-        IPersonalAbility pi = PersonalInfo;
+        var pi = PersonalInfo;
         if ((uint)n < pi.AbilityCount)
             Ability = pi.GetAbilityAtIndex(n);
     }
@@ -916,10 +911,10 @@ public abstract class PKM : ISpeciesForm, ITrainerID32, IGeneration, IShiny, ILa
     public void SetRandomIVs(int minFlawless = 0) => SetRandomIVs(stackalloc int[6], minFlawless);
 
     /// <inheritdoc cref="SetRandomIVs(Span{int},int)"/>
-    public void SetRandomIVs(IndividualValueSet template) => SetRandomIVs(stackalloc int[6], template);
+    public void SetRandomIVs(in IndividualValueSet template) => SetRandomIVs(stackalloc int[6], template);
 
     /// <inheritdoc cref="SetRandomIVs(Span{int},int)"/>
-    public void SetRandomIVs(Span<int> ivs, IndividualValueSet template)
+    public void SetRandomIVs(Span<int> ivs, in IndividualValueSet template)
     {
         var rnd = Util.Rand;
         for (int i = 0; i < ivs.Length; i++)

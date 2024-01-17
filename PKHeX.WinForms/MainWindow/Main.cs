@@ -91,7 +91,7 @@ public partial class Main : Form
 
     private readonly string[] main_langlist = Enum.GetNames(typeof(ProgramLanguage));
 
-    private static readonly List<IPlugin> Plugins = new();
+    private static readonly List<IPlugin> Plugins = [];
     #endregion
 
     #region Path Variables
@@ -380,7 +380,7 @@ public partial class Main : Form
         }
     }
 
-    private static bool IsPopupFormType(Form z) => z is not (Main or SplashScreen or SAV_FolderList);
+    private static bool IsPopupFormType(Form z) => z is not (Main or SplashScreen or SAV_FolderList or PokePreview);
 
     private void MainMenuSettings(object sender, EventArgs e)
     {
@@ -420,10 +420,14 @@ public partial class Main : Form
         C_SAV.M.Hover.GlowHover = settings.Hover.HoverSlotGlowEdges;
         ParseSettings.InitFromSettings(settings.Legality);
         PKME_Tabs.HideSecretValues = C_SAV.HideSecretDetails = settings.Privacy.HideSecretDetails;
-        EntityConverter.AllowIncompatibleConversion = settings.Advanced.AllowIncompatibleConversion;
-        EntityConverter.RejuvenateHOME = settings.Advanced.AllowGuessRejuvenateHOME;
         WinFormsUtil.DetectSaveFileOnFileOpen = settings.Startup.TryDetectRecentSave;
         SelectablePictureBox.FocusBorderDeflate = GenderToggle.FocusBorderDeflate = settings.Display.FocusBorderDeflate;
+
+        var converter = settings.Converter;
+        EntityConverter.AllowIncompatibleConversion = converter.AllowIncompatibleConversion;
+        EntityConverter.RejuvenateHOME = converter.AllowGuessRejuvenateHOME;
+        EntityConverter.VirtualConsoleSourceGen1 = converter.VirtualConsoleSourceGen1;
+        EntityConverter.VirtualConsoleSourceGen2 = converter.VirtualConsoleSourceGen2;
 
         SpriteBuilder.LoadSettings(settings.Sprite);
     }
@@ -441,24 +445,29 @@ public partial class Main : Form
             WinFormsUtil.Alert(result);
     }
 
+    /// <summary>
+    /// Dumps all Entity content stored in the SaveFile's boxes to disk.
+    /// </summary>
     private void MainMenuBoxDump(object sender, EventArgs e)
     {
-        // Dump all of box content to files.
-        string? path = null;
         DialogResult ld = WinFormsUtil.Prompt(MessageBoxButtons.YesNo, MsgDatabaseExport);
         if (ld == DialogResult.Yes)
-            path = DatabasePath;
-        else if (ld != DialogResult.No)
+        {
+            BoxExport.Export(C_SAV.SAV, DatabasePath, BoxExportSettings.Default);
+            return;
+        }
+        if (ld != DialogResult.No)
             return;
 
-        if (C_SAV.DumpBoxes(out string result, path))
-            WinFormsUtil.Alert(result);
+        using var dumper = new BoxExporter(C_SAV.SAV, BoxExporter.ExportOverride.All);
+        dumper.ShowDialog();
     }
 
     private void MainMenuBoxDumpSingle(object sender, EventArgs e)
     {
-        if (C_SAV.DumpBox(out string result))
-            WinFormsUtil.Alert(result);
+        C_SAV.SAV.CurrentBox = C_SAV.CurrentBox; // double check
+        using var dumper = new BoxExporter(C_SAV.SAV, BoxExporter.ExportOverride.Current);
+        dumper.ShowDialog();
     }
 
     private void MainMenuBatchEditor(object sender, EventArgs e)
@@ -888,7 +897,7 @@ public partial class Main : Form
         {
             if (ModifierKeys == Keys.Control || s3.IsCorruptPokedexFF())
             {
-                var g = new[] { GameVersion.R, GameVersion.S, GameVersion.E, GameVersion.FR, GameVersion.LG };
+                GameVersion[] g = [GameVersion.R, GameVersion.S, GameVersion.E, GameVersion.FR, GameVersion.LG];
                 var games = g.Select(z => GameInfo.VersionDataSource.First(v => v.Value == (int)z));
                 var msg = string.Format(MsgFileLoadVersionDetect, $"3 ({s3.Version})");
                 using var dialog = new SAV_GameSelect(games, msg, MsgFileLoadSaveSelectVersion);
@@ -913,7 +922,7 @@ public partial class Main : Form
                 string fr = GameInfo.GetVersionName(GameVersion.FR);
                 string lg = GameInfo.GetVersionName(GameVersion.LG);
                 string dual = "{1}/{2} " + MsgFileLoadVersionDetect;
-                var g = new[] { GameVersion.FR, GameVersion.LG };
+                GameVersion[] g = [GameVersion.FR, GameVersion.LG];
                 var games = g.Select(z => GameInfo.VersionDataSource.First(v => v.Value == (int)z));
                 var msg = string.Format(dual, "3", fr, lg);
                 using var dialog = new SAV_GameSelect(games, msg, MsgFileLoadSaveSelectVersion);
@@ -965,6 +974,9 @@ public partial class Main : Form
             PKME_Tabs.PopulateFields(pk); // put data back in form
             Text = GetProgramTitle(sav);
         }
+
+        foreach (var plugin in Plugins)
+            plugin.NotifyDisplayLanguageChanged(lang);
     }
     #endregion
 

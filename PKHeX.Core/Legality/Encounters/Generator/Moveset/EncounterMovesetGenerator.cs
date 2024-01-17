@@ -14,13 +14,14 @@ public static class EncounterMovesetGenerator
     /// <summary>
     /// Order in which <see cref="IEncounterable"/> objects are yielded from the <see cref="GenerateVersionEncounters(PKM,ReadOnlyMemory{ushort},GameVersion)"/> method.
     /// </summary>
-    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
-    public static IReadOnlyCollection<EncounterTypeGroup> PriorityList { get; set; } = PriorityList = (EncounterTypeGroup[])Enum.GetValues(typeof(EncounterTypeGroup));
+    public static IReadOnlyCollection<EncounterTypeGroup> PriorityList { get; set; } = GetAllGroups();
 
     /// <summary>
     /// Resets the <see cref="PriorityList"/> to the default values.
     /// </summary>
-    public static void ResetFilters() => PriorityList = (EncounterTypeGroup[])Enum.GetValues(typeof(EncounterTypeGroup));
+    public static void ResetFilters() => PriorityList = GetAllGroups();
+
+    private static EncounterTypeGroup[] GetAllGroups() => (EncounterTypeGroup[])Enum.GetValues(typeof(EncounterTypeGroup));
 
     /// <summary>
     /// Gets possible <see cref="IEncounterable"/> objects that allow all moves requested to be learned.
@@ -46,7 +47,7 @@ public static class EncounterMovesetGenerator
     }
 
     /// <summary>
-    /// Adapts the input <see cref="pk"/> so that it may match as many encounters as possible (indications of trades to other game pairs, etc).
+    /// Adapts the input <see cref="pk"/> so that it may match as many encounters as possible (indications of trades to other game pairs, etc.).
     /// </summary>
     /// <param name="pk">Rough Pokémon data which contains the requested species, gender, and form.</param>
     /// <param name="info">Trainer information of the receiver.</param>
@@ -207,7 +208,7 @@ public static class EncounterMovesetGenerator
     private static ushort[] GetNeededMoves(PKM pk, ReadOnlySpan<ushort> moves, GameVersion ver, int generation, EntityContext context)
     {
         if (pk.Species == (int)Species.Smeargle)
-            return Array.Empty<ushort>();
+            return [];
 
         var length = pk.MaxMoveID + 1;
         var rent = ArrayPool<bool>.Shared.Rent(length);
@@ -231,7 +232,7 @@ public static class EncounterMovesetGenerator
         ArrayPool<bool>.Shared.Return(rent);
 
         if (ctr == 0)
-            return Array.Empty<ushort>();
+            return [];
         return result[..ctr].ToArray();
     }
 

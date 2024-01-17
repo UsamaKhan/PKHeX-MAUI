@@ -13,13 +13,13 @@ public partial class StatEditor : UserControl
     public StatEditor()
     {
         InitializeComponent();
-        MT_IVs = new[] { TB_IVHP, TB_IVATK, TB_IVDEF, TB_IVSPE, TB_IVSPA, TB_IVSPD };
-        MT_EVs = new[] { TB_EVHP, TB_EVATK, TB_EVDEF, TB_EVSPE, TB_EVSPA, TB_EVSPD };
-        MT_AVs = new[] { TB_AVHP, TB_AVATK, TB_AVDEF, TB_AVSPE, TB_AVSPA, TB_AVSPD };
-        MT_GVs = new[] { TB_GVHP, TB_GVATK, TB_GVDEF, TB_GVSPE, TB_GVSPA, TB_GVSPD };
-        MT_Stats = new[] { Stat_HP, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD };
-        L_Stats = new[] { Label_HP, Label_ATK, Label_DEF, Label_SPE, Label_SPA, Label_SPD };
-        MT_Base = new[] { TB_BaseHP, TB_BaseATK, TB_BaseDEF, TB_BaseSPE, TB_BaseSPA, TB_BaseSPD };
+        MT_IVs = [TB_IVHP, TB_IVATK, TB_IVDEF, TB_IVSPE, TB_IVSPA, TB_IVSPD];
+        MT_EVs = [TB_EVHP, TB_EVATK, TB_EVDEF, TB_EVSPE, TB_EVSPA, TB_EVSPD];
+        MT_AVs = [TB_AVHP, TB_AVATK, TB_AVDEF, TB_AVSPE, TB_AVSPA, TB_AVSPD];
+        MT_GVs = [TB_GVHP, TB_GVATK, TB_GVDEF, TB_GVSPE, TB_GVSPA, TB_GVSPD];
+        MT_Stats = [Stat_HP, Stat_ATK, Stat_DEF, Stat_SPE, Stat_SPA, Stat_SPD];
+        L_Stats = [Label_HP, Label_ATK, Label_DEF, Label_SPE, Label_SPA, Label_SPD];
+        MT_Base = [TB_BaseHP, TB_BaseATK, TB_BaseDEF, TB_BaseSPE, TB_BaseSPA, TB_BaseSPD];
 
         TB_BST.ResetForeColor();
         TB_IVTotal.ForeColor = TB_EVTotal.ForeColor = MT_EVs[0].ForeColor;
@@ -32,10 +32,11 @@ public partial class StatEditor : UserControl
     public Color StatDecreased { get; set; } = Color.Blue;
     public Color StatHyperTrained { get; set; } = Color.LightGreen;
 
-    public IMainEditor MainEditor { private get; set; } = null!;
+    public PKMEditor MainEditor { private get; set; } = null!;
     public bool HaX { get => CHK_HackedStats.Enabled; set => CHK_HackedStats.Enabled = CHK_HackedStats.Visible = value; }
 
     private readonly ToolTip EVTip = new();
+    private StatEditorStatOrder StatOrder;
 
     public bool Valid
     {
@@ -398,8 +399,8 @@ public partial class StatEditor : UserControl
         if (Entity is ITeraType)
         {
             var pi = Entity.PersonalInfo;
-            PB_TeraType1.SetType(pi.Type1);
-            PB_TeraType2.SetType(pi.Type2);
+            PB_TeraType1.SetType(pi.Type1, false); // Personal Info are just regular move types.
+            PB_TeraType2.SetType(pi.Type2, false); // Personal Info are just regular move types.
         }
     }
 
@@ -609,6 +610,40 @@ public partial class StatEditor : UserControl
             tb.ResetBackColor();
     }
 
+    private void SetStatOrder(StatEditorStatOrder order)
+    {
+        if (order == StatOrder)
+            return;
+
+        // https://stackoverflow.com/a/30219698
+        // WinForms hack to create the handles and avoid Z-order changing on visibility toggle.
+        // Otherwise, our stat ordering may be incorrect if we change it more than once.
+        foreach (Control ctrl in FLP_Stats.Controls)
+            _ = ctrl.Handle;
+
+        // In Generation 1, Special Defense and Special Attack are combined.
+        // Additionally, Speed is shown before Special.
+        const int baseIndex = 1;
+        if (order == StatEditorStatOrder.Gen1Special)
+        {
+            FLP_SpD.Visible = Label_SPA.Visible = false;
+            Label_SPC.Visible = true;
+            FLP_Stats.Controls.SetChildIndex(FLP_Spe, baseIndex + 3); // Speed
+        }
+        else if (order == StatEditorStatOrder.Current)
+        {
+            FLP_SpD.Visible = Label_SPA.Visible = true;
+            Label_SPC.Visible = false;
+            FLP_Stats.Controls.SetChildIndex(FLP_Spe, baseIndex + 5); // Speed
+        }
+        else
+        {
+            throw new ArgumentOutOfRangeException(nameof(order), order, null);
+        }
+
+        StatOrder = order;
+    }
+
     public void ToggleInterface(PKM pk, int gen)
     {
         FLP_StatsTotal.Visible = gen >= 3;
@@ -619,30 +654,21 @@ public partial class StatEditor : UserControl
         FLP_DynamaxLevel.Visible = gen == 8;
         FLP_AlphaNoble.Visible = pk is PA8;
 
+        SetStatOrder(gen == 1 ? StatEditorStatOrder.Gen1Special : StatEditorStatOrder.Current);
+
         switch (gen)
         {
             case 1:
-                FLP_SpD.Visible = false;
-                Label_SPA.Visible = false;
-                Label_SPC.Visible = true;
                 TB_IVHP.Enabled = false;
                 SetEVMaskSize(Stat_HP.Size, "00000", MT_EVs);
                 break;
             case 2:
-                FLP_SpD.Visible = true;
-                Label_SPA.Visible = true;
-                Label_SPC.Visible = false;
                 TB_IVHP.Enabled = false;
                 SetEVMaskSize(Stat_HP.Size, "00000", MT_EVs);
-                TB_EVSPD.Enabled = TB_IVSPD.Enabled = false;
                 break;
             default:
-                FLP_SpD.Visible = true;
-                Label_SPA.Visible = true;
-                Label_SPC.Visible = false;
                 TB_IVHP.Enabled = true;
                 SetEVMaskSize(TB_EVTotal.Size, "000", MT_EVs);
-                TB_EVSPD.Enabled = TB_IVSPD.Enabled = true;
                 break;
         }
 
@@ -673,6 +699,8 @@ public partial class StatEditor : UserControl
 
     private const string TeraOverrideNone = "---";
     private const byte TeraOverrideNoneValue = TeraTypeUtil.OverrideNone;
+    private const byte TeraStellarValue = TeraTypeUtil.Stellar;
+    private const byte TeraDisplayIndex = TeraTypeUtil.StellarTypeDisplayStringIndex;
 
     private void L_TeraTypeOriginal_Click(object sender, EventArgs e)
     {
@@ -705,11 +733,12 @@ public partial class StatEditor : UserControl
         CB_TeraTypeOriginal.InitializeBinding();
         CB_TeraTypeOverride.InitializeBinding();
 
-        var types = GameInfo.Strings.types;
-        CB_HPType.DataSource = Util.GetCBList(types.AsSpan(1, 16));
+        var types = GameInfo.Strings.types.AsSpan();
+        CB_HPType.DataSource = Util.GetCBList(types.Slice(1, HiddenPower.TypeCount));
 
-        var tera = Util.GetCBList(types);
+        var tera = Util.GetCBList(types[..TeraDisplayIndex]);
         tera.Insert(0, new(TeraOverrideNone, TeraOverrideNoneValue));
+        tera.Add(new(types[TeraDisplayIndex], TeraStellarValue));
         CB_TeraTypeOriginal.DataSource = new BindingSource(tera, null);
         CB_TeraTypeOverride.DataSource = new BindingSource(tera, null);
 
@@ -719,13 +748,13 @@ public partial class StatEditor : UserControl
     private void CHK_Gigantamax_CheckedChanged(object sender, EventArgs e)
     {
         if (!ChangingFields)
-            ((PKMEditor)MainEditor).UpdateSprite();
+            MainEditor.UpdateSprite();
     }
 
     private void CHK_IsAlpha_CheckedChanged(object sender, EventArgs e)
     {
         if (!ChangingFields)
-            ((PKMEditor)MainEditor).UpdateSprite();
+            MainEditor.UpdateSprite();
     }
 
     private void L_TeraTypeOverride_Click(object sender, EventArgs e) => CB_TeraTypeOverride.SelectedValue = Entity.SV ? (int)TeraOverrideNoneValue : CB_TeraTypeOriginal.SelectedValue;
@@ -750,7 +779,7 @@ public partial class StatEditor : UserControl
             type = original;
         PB_TeraType.Image = TypeSpriteUtil.GetTypeSpriteGem(type);
         if (!ChangingFields)
-            ((PKMEditor)MainEditor).UpdateSprite();
+            MainEditor.UpdateSprite();
     }
 
     public void CenterSubEditors()
@@ -763,14 +792,39 @@ public sealed class TypePictureBox : PictureBox
 {
     private byte Type;
 
-    public void SetType(byte type) => BackColor = TypeColor.GetTypeSpriteColor(Type = type);
+    public void SetType(byte type, bool tera) => BackColor = tera
+        ? TypeColor.GetTeraSpriteColor(Type = type)
+        : TypeColor.GetTypeSpriteColor(Type = type);
+
     private readonly ToolTip Tip = new() { InitialDelay = 500, ReshowDelay = 500, ShowAlways = true };
 
     // Show a tooltip when hovered.
     protected override void OnMouseHover(EventArgs e)
     {
         base.OnMouseHover(e);
-        var name = GameInfo.Strings.types[Type];
+        var index = Type;
+        if (index == TeraTypeUtil.Stellar)
+            index = TeraTypeUtil.StellarTypeDisplayStringIndex;
+        var name = GameInfo.Strings.types[index];
         Tip.SetToolTip(this, name);
     }
+}
+
+/// <summary>
+/// Stat display order for a stat editor.
+/// </summary>
+public enum StatEditorStatOrder
+{
+    /// <summary>
+    /// Stat order for everything after Generation 1.
+    /// </summary>
+    /// <remarks>
+    /// Default load state for a GUI.
+    /// </remarks>
+    Current = 0,
+
+    /// <summary>
+    /// Stat order for Generation 1; Speed before Special.
+    /// </summary>
+    Gen1Special,
 }
